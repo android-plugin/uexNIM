@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest>
+    <!--以下是网易云信的配置-->
+    <meta-data
+        android:name="com.netease.nim.appKey"
+        android:value="$appKey$" />
+    <service
+        android:name="com.netease.nimlib.service.NimService"
+        android:process=":core"/>
+
+    <service
+        android:name="com.netease.nimlib.service.NimService$Aux"
+        android:process=":core"/>
+
+    <!-- 云信SDK的监视系统启动和网络变化的广播接收器，用户开机自启动以及网络变化时候重新登录，
+        保持和 NimService 同一进程 -->
+    <receiver android:name="com.netease.nimlib.service.NimReceiver"
+        android:process=":core"
+        android:exported="false">
+        <intent-filter>
+            <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            <action android:name="android.net.conn.CONNECTIVITY_CHANGE"/>
+        </intent-filter>
+    </receiver>
+
+    <!-- 云信进程间通信 Receiver -->
+    <receiver android:name="com.netease.nimlib.service.ResponseReceiver"/>
+
+    <!-- 安卓保活配置 -->
+    <service
+        android:name="com.netease.cosine.core.CosineService"
+        android:process=":cosine">
+    </service>
+
+    <receiver
+        android:name="com.netease.cosine.target.CosineReceiver"
+        android:exported="true"
+        android:process=":cosine">
+    </receiver>
+
+    <meta-data
+        android:name="com.netease.cosine.target"
+        android:value=""/>
+    <meta-data
+        android:name="com.netease.cosine.target.receiver"
+        android:value="com.netease.nimlib.service.NimReceiver"/>
+
+    <!-- 控制呼吸灯，用于新消息提醒 -->
+    <uses-permission android:name="android.permission.FLASHLIGHT" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+
+    <!-- 多媒体相关 -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+
+    <!-- 如果需要实时音视频通话模块，下面的权限也是必须的。否则，可以不加 -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <!-- 接收 SDK 消息广播权限， 第三方 APP 接入时，请将 com.netease.nim.demo 替换为自己的包名 -->
+    <permission
+        android:name="$packageName$.permission.RECEIVE_MSG"
+        android:protectionLevel="signature"/>
+    <uses-permission android:name="$packageName$.permission.RECEIVE_MSG"/>
+</manifest>

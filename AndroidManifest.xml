@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.zywx.wbpalmstar.widgetone.uexnim"
+    android:versionCode="1"
+    android:versionName="3.0" 
+    android:installLocation="internalOnly" >
+    
+    <application
+        android:name="org.zywx.wbpalmstar.widgetone.WidgetOneApplication"
+        android:allowClearUserData="false"
+        android:icon="@drawable/icon"
+        android:label="@string/app_name" 
+        android:hardwareAccelerated="false"
+        android:allowBackup="true"
+        android:vmSafeMode="true">
+        <activity
+            android:name="org.zywx.wbpalmstar.engine.EBrowserActivity"
+            android:alwaysRetainTaskState="true"
+            android:configChanges="keyboardHidden|orientation"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:theme="@style/browser_main_theme"
+            android:windowSoftInputMode="stateHidden|adjustPan" >
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="appcanscheme"/>
+            </intent-filter>
+        </activity>
+         <activity
+            android:name="org.zywx.wbpalmstar.platform.mam.PolicyActivity"
+            android:configChanges="orientation|keyboardHidden|navigation" android:windowSoftInputMode="adjustPan"/>
+         <activity
+            android:name="org.zywx.wbpalmstar.platform.mam.PolicyInfoActivity"
+            android:configChanges="orientation|keyboardHidden|navigation" android:windowSoftInputMode="adjustPan"/>
+        <activity android:name="org.zywx.wbpalmstar.engine.TempActivity"
+            android:launchMode="standard"
+            android:screenOrientation="portrait"
+            android:theme="@style/browser_loading_theme"/>
+        <activity android:name="org.zywx.wbpalmstar.engine.LoadingActivity"
+            android:configChanges="keyboardHidden|orientation"
+            android:theme="@style/browser_loading_theme"
+            android:screenOrientation="portrait"
+            android:launchMode="standard"
+            >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <receiver
+            android:name="org.zywx.wbpalmstar.platform.push.PushRecieveMsgReceiver">
+            <intent-filter>
+                <action android:name="org.zywx.push.receive" />
+            </intent-filter>
+        </receiver>
+        <!--以下是网易云信的配置-->
+        <meta-data
+            android:name="com.netease.nim.appKey"
+            android:value="8ce4f10b741de88e2b6bd86fb9c27cc3" />
+        <service
+            android:name="com.netease.nimlib.service.NimService"
+            android:process=":core"/>
+
+        <service
+            android:name="com.netease.nimlib.service.NimService$Aux"
+            android:process=":core"/>
+
+        <!-- 云信SDK的监视系统启动和网络变化的广播接收器，用户开机自启动以及网络变化时候重新登录，
+            保持和 NimService 同一进程 -->
+        <receiver android:name="com.netease.nimlib.service.NimReceiver"
+            android:process=":core"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- 云信进程间通信 Receiver -->
+        <receiver android:name="com.netease.nimlib.service.ResponseReceiver"/>
+
+        <!-- 安卓保活配置 -->
+        <service
+            android:name="com.netease.cosine.core.CosineService"
+            android:process=":cosine">
+        </service>
+
+        <receiver
+            android:name="com.netease.cosine.target.CosineReceiver"
+            android:exported="true"
+            android:process=":cosine">
+        </receiver>
+
+        <meta-data
+            android:name="com.netease.cosine.target"
+            android:value=""/>
+        <meta-data
+            android:name="com.netease.cosine.target.receiver"
+            android:value="com.netease.nimlib.service.NimReceiver"/>
+
+
+    </application>
+
+    <uses-sdk android:minSdkVersion="8"/>
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.READ_LOGS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- 控制呼吸灯，用于新消息提醒 -->
+    <uses-permission android:name="android.permission.FLASHLIGHT" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+
+    <!-- 多媒体相关 -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+
+    <!-- 如果需要实时音视频通话模块，下面的权限也是必须的。否则，可以不加 -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <permission
+        android:name="org.zywx.wbpalmstar.widgetone.uexnim.permission.RECEIVE_MSG"
+        android:protectionLevel="signature"/>
+    <!-- 接收 SDK 消息广播权限， 第三方 APP 接入时，请将 com.netease.nim.demo 替换为自己的包名 -->
+    <uses-permission android:name="org.zywx.wbpalmstar.widgetone.uexnim.permission.RECEIVE_MSG"/>
+
+
+    <supports-screens
+        android:anyDensity="true"
+        android:largeScreens="true"
+        android:xlargeScreens="true"
+        android:normalScreens="true"
+        android:resizeable="true"
+        android:smallScreens="true" />
+
+</manifest>

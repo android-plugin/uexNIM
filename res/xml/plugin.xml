@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uexplugins>
+    <plugin
+        className="org.zywx.wbpalmstar.plugin.uexnim.EUExNIM" uexName="uexNIM" >
+        <method name = "registerApp" />
+        <method name = "login" />
+        <method name = "logout" />
+        <method name = "onKick"/>
+        <method name = "onMultiLoginClientsChanged"/>
+        <method name = "registerUser"/>
+        <method name = "sendText" />
+        <method name = "sendImage" />
+        <method name = "sendLocationMsg" />
+        <method name = "sendAudio" />
+        <method name = "sendVideo" />
+        <method name = "sendFile" />
+
+        <!--Audio-->
+        <method name="switchAudioOutputDevice" />
+        <method name="isPlaying" />
+        <method name="playAudio" />
+        <method name="stopPlay" />
+        <method name="isRecording" />
+        <method name="recordAudioForDuration" />
+
+
+        <method name = "allRecentSession" />
+        <method name = "fetchMessageHistory" />
+
+
+        <!--群组相关功能-->
+        <method name="allMyTeams"/>
+        <method name="teamById"/>
+        <method name="fetchTeamInfo"/>
+        <method name="createTeam"/>
+        <method name="addUsers"/>
+        <method name="acceptInviteWithTeam"/>
+        <method name="rejectInviteWithTeam"/>
+        <method name="applyToTeam"/>
+        <method name="passApplyToTeam"/>
+        <method name="rejectApplyToTeam"/>
+        <method name="updateTeamName"/>
+        <method name="updateTeamIntro"/>
+        <method name="updateTeamAnnouncement"/>
+        <method name="updateTeamJoinMode"/>
+        <method name="addManagersToTeam"/>
+        <method name="removeManagersFromTeam"/>
+        <method name="transferManagerWithTeam"/>
+        <method name="fetchTeamMembers"/>
+        <method name="quitTeam"/>
+        <method name="kickUsers"/>
+        <method name="dismissTeam"/>
+        <method name="updateNotifyStateForTeam"/>
+        <method name="notifyForNewMsgForTeam"/>
+
+    </plugin>
+</uexplugins>
