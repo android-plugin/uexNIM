@@ -26,77 +26,77 @@ import java.util.Map;
 public class ListenerRegister {
     private ListenersCallback callback;
 
-    public void registerListeners(){
+    public void registerListeners(boolean register){
+        registerLoginListener(register); //注册用户登录相关的监听
+        registerMsgObserver(register);
+        registerTeamObservers(register);
+        registerRecentContactListener(register); //注册最近联系人相关的监听
+    }
 
-        // 如果发送的多媒体文件消息，还需要监听文件的上传进度。
-        NIMClient.getService(MsgServiceObserve.class).observeAttachmentProgress(new Observer<AttachmentProgress>() {
-            @Override
-            public void onEvent(AttachmentProgress attachmentProgress) {
-                //如果是接收对方发来的图片，音频，视频，也会触发这个回调。只是getTransferred 为 0
-                //针对上传
-                if (attachmentProgress.getTransferred() != 0) {
-                    Log.i("Listener", "upload progress:" + attachmentProgress.getTransferred() + " /" + attachmentProgress.getTotal());
-                    HashMap<String, Object> result = new HashMap<String, Object>();
-                    result.put("result", true);
-                    result.put(NIMConstant.TEXT_PROGRESS, attachmentProgress.getTransferred() / attachmentProgress.getTotal());
-                    result.put(NIMConstant.TEXT_MESSAGE_ID, attachmentProgress.getUuid());
-                    callback.onSendMessageWithProgress(result);
-                }
-
-            }
-        }, true);
-        //监听接收的消息
-        Observer<List<IMMessage>> incomingMessageObserver = new Observer<List<IMMessage>>() {
-            @Override
-            public void onEvent(List<IMMessage> messages) {
-                // 处理新收到的消息，为了上传处理方便，SDK 保证参数 messages 全部来自同一个聊天对象。
-                callback.onReceivedMessages(messages);
-
-            }
-        };
+    private void registerMsgObserver(boolean register) {
+        NIMClient.getService(MsgServiceObserve.class).observeAttachmentProgress(attachmentProgressObserver, true);
         NIMClient.getService(MsgServiceObserve.class).observeReceiveMessage(incomingMessageObserver, true);
-
-        // 监听消息状态变化
-        Observer<IMMessage> statusObserver = new Observer<IMMessage>() {
-            @Override
-            public void onEvent(IMMessage msg) {
-                callback.onMessageStatusChange(msg);
-            }
-        };
-        NIMClient.getService(MsgServiceObserve.class).observeMsgStatus(statusObserver, true);
-
-        //监听最近会话变更
-        Observer<List<RecentContact>> messageObserver = new Observer<List<RecentContact>>() {
-            @Override
-            public void onEvent(List<RecentContact> messages) {
-                callback.onUpdateRecentSession(messages);
-            }
-        };
-        NIMClient.getService(MsgServiceObserve.class).observeRecentContact(messageObserver, true);
-        registerTeamObservers(true);
-
+        NIMClient.getService(MsgServiceObserve.class).observeMsgStatus(messageStatusObserver, true);
     }
-    public void registerLoginStatusListener() {
-        //监听登录状态
-        NIMClient.getService(AuthServiceObserver.class).observeOnlineStatus(new Observer<StatusCode>() {
-            @Override
-            public void onEvent(StatusCode statusCode) {
-                if (StatusCode.KICK_BY_OTHER_CLIENT == statusCode) {
-                    callback.onKick(1);
-                } else if (StatusCode.KICKOUT == statusCode) {
-                    callback.onKick(3);
-                }
+
+    //监听接收的消息
+    private Observer<List<IMMessage>> incomingMessageObserver = new Observer<List<IMMessage>>() {
+        @Override
+        public void onEvent(List<IMMessage> messages) {
+            // 处理新收到的消息，为了上传处理方便，SDK 保证参数 messages 全部来自同一个聊天对象。
+            callback.onReceivedMessages(messages);
+
+        }
+    };
+
+    // 监听消息状态变化
+    private Observer<IMMessage> messageStatusObserver = new Observer<IMMessage>() {
+        @Override
+        public void onEvent(IMMessage msg) {
+            callback.onMessageStatusChange(msg);
+        }
+    };
+
+    // 如果发送的多媒体文件消息，还需要监听文件的上传进度。
+    private Observer <AttachmentProgress> attachmentProgressObserver = new Observer<AttachmentProgress>() {
+        @Override
+        public void onEvent(AttachmentProgress attachmentProgress) {
+            //如果是接收对方发来的图片，音频，视频，也会触发这个回调。只是getTransferred 为 0
+            //针对上传
+            if (attachmentProgress.getTransferred() != 0) {
+                Log.i("Listener", "upload progress:" + attachmentProgress.getTransferred() + " /" + attachmentProgress.getTotal());
+                HashMap<String, Object> result = new HashMap<String, Object>();
+                result.put("result", true);
+                result.put(NIMConstant.TEXT_PROGRESS, attachmentProgress.getTransferred() / attachmentProgress.getTotal());
+                result.put(NIMConstant.TEXT_MESSAGE_ID, attachmentProgress.getUuid());
+                callback.onSendMessageWithProgress(result);
             }
-        }, true);
+        }
+    };
+
+    private void registerLoginListener(boolean register) {
+        //登录监听
+        NIMClient.getService(AuthServiceObserver.class).observeOnlineStatus(loginStatusObserver, register);
+        //多端登录
+        NIMClient.getService(AuthServiceObserver.class).observeOtherClients(multiLoginClientObserver, register);
     }
-    public void registerMultiLoginClientListener() {
-        NIMClient.getService(AuthServiceObserver.class).observeOtherClients(new Observer<List<OnlineClient>>() {
-            @Override
-            public void onEvent(List<OnlineClient> onlineClients) {
-                callback.onMultiLoginClientsChanged(onlineClients);
+
+    private Observer<StatusCode> loginStatusObserver = new Observer<StatusCode>() {
+        @Override
+        public void onEvent(StatusCode statusCode) {
+            if (StatusCode.KICK_BY_OTHER_CLIENT == statusCode) {
+                callback.onKick(1);
+            } else if (StatusCode.KICKOUT == statusCode) {
+                callback.onKick(3);
             }
-        },true);
-    }
+        }
+    };
+    private Observer<List<OnlineClient>> multiLoginClientObserver = new Observer<List<OnlineClient>>() {
+        @Override
+        public void onEvent(List<OnlineClient> onlineClients) {
+            callback.onMultiLoginClientsChanged(onlineClients);
+        }
+    };
     public void registerTeamObservers(boolean register) {
         NIMClient.getService(TeamServiceObserver.class).observeTeamUpdate(teamUpdateObserver, register);
         NIMClient.getService(TeamServiceObserver.class).observeTeamRemove(teamRemoveObserver, register);
@@ -145,6 +145,18 @@ public class ListenerRegister {
             // 3、刷新界面
         }
     };
+
+    private void registerRecentContactListener(boolean register) {
+        NIMClient.getService(MsgServiceObserve.class).observeRecentContact(recentContactObserver, true);
+    }
+    //监听最近会话变更
+   private Observer<List<RecentContact>> recentContactObserver = new Observer<List<RecentContact>>() {
+        @Override
+        public void onEvent(List<RecentContact> messages) {
+            callback.onUpdateRecentSession(messages);
+        }
+    };
+
     public void setCallback(ListenersCallback callback) {
         this.callback = callback;
     }

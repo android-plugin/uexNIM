@@ -117,8 +117,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             Toast.makeText(mContext,"注册appKey出错!", Toast.LENGTH_SHORT).show();
         }
         ListenerRegister register = new ListenerRegister();
-        register.registerListeners();
         register.setCallback(this);
+        register.registerListeners(true);
     }
 
     private void registerLocaleReceiver(boolean register) {
@@ -251,15 +251,16 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      */
     @Override
     public void onMultiLoginClientsChanged(List<OnlineClient> onlineClients) {
-        List<OnlineClientVo> list = new ArrayList<OnlineClientVo>();
-        for (OnlineClient client : onlineClients) {
-            OnlineClientVo vo = DataUtil.trans2OnlineClientVo(client);
-            list.add(vo);
+        if (onlineClients != null && onlineClients.size() >0) {
+            List<OnlineClientVo> list = new ArrayList<OnlineClientVo>();
+            for (OnlineClient client : onlineClients) {
+                OnlineClientVo vo = DataUtil.trans2OnlineClientVo(client);
+                list.add(vo);
+            }
+            HashMap<String, Object> result = new HashMap<String, Object>();
+            result.put("clients", result);
+            evaluateRootWindowScript(JsConst.ON_MULTI_LOGIN_CLIENTS_CHANGED, getJSONFromMap(result));
         }
-        HashMap<String, Object> result = new HashMap<String, Object>();
-        result.put("clients", result);
-        evaluateRootWindowScript(JsConst.ON_MULTI_LOGIN_CLIENTS_CHANGED, getJSONFromMap(result));
-
     }
 
     //退出操作
