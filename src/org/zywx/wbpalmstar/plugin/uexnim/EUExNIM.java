@@ -484,7 +484,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 longitude, // 经度
                 title // 地址信息描述
         );
-        NIMClient.getService(MsgService.class).sendMessage(message, false);
+        NIMClient.getService(MsgService.class).sendMessage(message, false).setCallback(sendMsgCallback);
     }
     //发送音频
     public void sendAudio(String params[]) {
@@ -630,7 +630,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 if (recents.size() == 0) {
                     map.put(NIMConstant.TEXT_UNREAD_COUNT, 0);
                 } else {
-                    map.put(NIMConstant.TEXT_LAST_MESSAGE, recents.get(recents.size() - 1));
+                    map.put(NIMConstant.TEXT_LAST_MESSAGE, recents.get(recents.size() - 1).getRecentMessageId());
                     int unreadNum = 0;
                     for (RecentContact r : recents) {
                         unreadNum += r.getUnreadCount();
