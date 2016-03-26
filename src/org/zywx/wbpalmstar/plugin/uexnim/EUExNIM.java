@@ -35,9 +35,15 @@ import com.netease.nimlib.sdk.media.record.IAudioRecordCallback;
 import com.netease.nimlib.sdk.media.record.RecordType;
 import com.netease.nimlib.sdk.msg.MessageBuilder;
 import com.netease.nimlib.sdk.msg.MsgService;
+import com.netease.nimlib.sdk.msg.attachment.AudioAttachment;
+import com.netease.nimlib.sdk.msg.attachment.ImageAttachment;
+import com.netease.nimlib.sdk.msg.attachment.LocationAttachment;
+import com.netease.nimlib.sdk.msg.attachment.VideoAttachment;
+import com.netease.nimlib.sdk.msg.constant.MsgTypeEnum;
 import com.netease.nimlib.sdk.msg.constant.SessionTypeEnum;
 import com.netease.nimlib.sdk.msg.model.IMMessage;
 import com.netease.nimlib.sdk.msg.model.RecentContact;
+import com.netease.nimlib.sdk.msg.model.SystemMessage;
 import com.netease.nimlib.sdk.team.TeamService;
 import com.netease.nimlib.sdk.team.constant.TeamFieldEnum;
 import com.netease.nimlib.sdk.team.constant.TeamTypeEnum;
@@ -53,6 +59,7 @@ import org.zywx.wbpalmstar.base.BUtility;
 import org.zywx.wbpalmstar.base.ResoureFinder;
 import org.zywx.wbpalmstar.engine.EBrowserView;
 import org.zywx.wbpalmstar.engine.universalex.EUExBase;
+import org.zywx.wbpalmstar.plugin.uexnim.util.CommonUtil;
 import org.zywx.wbpalmstar.plugin.uexnim.util.ContactHttpClient;
 import org.zywx.wbpalmstar.plugin.uexnim.util.DataUtil;
 import org.zywx.wbpalmstar.plugin.uexnim.util.MD5;
@@ -60,11 +67,14 @@ import org.zywx.wbpalmstar.plugin.uexnim.util.NIMConstant;
 import org.zywx.wbpalmstar.plugin.uexnim.util.SharedPreferencesHelper;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.MessageVo;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.OnlineClientVo;
+import org.zywx.wbpalmstar.plugin.uexnim.vo.RecentSessionVo;
+import org.zywx.wbpalmstar.plugin.uexnim.vo.SystemMessageVo;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.TeamMemberVo;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.TeamVo;
 import org.zywx.wbpalmstar.widgetone.WidgetOneApplication;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -77,6 +87,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
     private final String MSG_TEAM_ID_EMPTY = "teamId can not be null";
     private ResoureFinder finder;
+    private AudioPlayer player;
+    private String TEMP_PATH = "nim_temp";
 
     public EUExNIM(Context context, EBrowserView eBrowserView) {
         super(context, eBrowserView);
@@ -621,23 +633,57 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             @Override
             public void onResult(int code, List<RecentContact> recents, Throwable e) {
                 HashMap<String, Object> map = new HashMap<String, Object>();
-                if (code != ResponseCode.RES_SUCCESS || recents == null) {
+                if (code != ResponseCode.RES_SUCCESS || recents == null || recents.size() == 0) {
                     map.put(NIMConstant.TEXT_RESULT, false);
                     map.put(NIMConstant.TEXT_ERROR, "无最近会话消息");
                     evaluateRootWindowScript(JsConst.CALLBACK_ALL_RECENT_SESSION, getJSONFromMap(map));
                     return;
                 }
-                if (recents.size() == 0) {
-                    map.put(NIMConstant.TEXT_UNREAD_COUNT, 0);
-                } else {
-                    map.put(NIMConstant.TEXT_LAST_MESSAGE, recents.get(recents.size() - 1).getRecentMessageId());
-                    int unreadNum = 0;
-                    for (RecentContact r : recents) {
-                        unreadNum += r.getUnreadCount();
-                    }
-                    map.put(NIMConstant.TEXT_UNREAD_COUNT, unreadNum);
-                }
+                List<RecentSessionVo> list = new ArrayList<RecentSessionVo>();
+                for (RecentContact recent : recents) {
+                    RecentSessionVo recentVo = new RecentSessionVo();
+                    recentVo.setSessionTypeEnum(recent.getSessionType());
+                    recentVo.setUnreadCount(recent.getUnreadCount());
 
+                    MsgTypeEnum msgTypeEnum= recent.getMsgType();
+
+                    MessageVo vo = new MessageVo();
+                    vo.setMessageId(recent.getRecentMessageId());
+                    vo.setFrom(recent.getFromAccount());
+                    if (msgTypeEnum == MsgTypeEnum.text) {
+                        vo.setText(recent.getContent());
+                    } else if (msgTypeEnum == MsgTypeEnum.audio) {
+                        AudioAttachment attach = (AudioAttachment) recent.getAttachment();
+                        vo.setFileLength(attach.getSize());
+                        vo.setPath(attach.getPath());
+                        vo.setUrl(attach.getUrl());
+                        vo.setFileLength(attach.getSize());
+                        vo.setDuration(attach.getDuration());
+
+                    } else if (msgTypeEnum == MsgTypeEnum.image) {
+                        ImageAttachment attach = (ImageAttachment) recent.getAttachment();
+                        vo.setFileLength(attach.getSize());
+                        vo.setPath(attach.getPathForSave());
+                        vo.setUrl(attach.getUrl());
+                        vo.setThumbPath(attach.getThumbPathForSave());
+                        vo.setThumbUrl(attach.getThumbPath());
+
+                    } else if (msgTypeEnum == MsgTypeEnum.video) {
+                        VideoAttachment attach = (VideoAttachment) recent.getAttachment();
+                        vo.setFileLength(attach.getSize());
+                        vo.setPath(attach.getPathForSave());
+                        vo.setUrl(attach.getUrl());
+                        vo.setCoverUrl(attach.getThumbPathForSave() );
+                    } else if (msgTypeEnum == MsgTypeEnum.location) {
+                        LocationAttachment attach = (LocationAttachment) recent.getAttachment();
+                        vo.setTitle(attach.getAddress());
+                        vo.setLatitude(attach.getLatitude());
+                        vo.setLongitude(attach.getLongitude());
+                    }
+                    recentVo.setLastMessage(vo);
+                    list.add(recentVo);
+                }
+                map.put("sessions", new Gson().toJson(list));
                 evaluateRootWindowScript(JsConst.CALLBACK_ALL_RECENT_SESSION, getJSONFromMap(map));
             }
         });
@@ -683,7 +729,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             public void onSuccess(List<IMMessage> imMessages) {
                 HashMap<String, Object> result = new HashMap<String, Object>();
                 List<MessageVo> list = new ArrayList<MessageVo>();
-                for (IMMessage msg:imMessages) {
+                for (IMMessage msg : imMessages) {
                     list.add(DataUtil.trans2MessageVo(msg));
                 }
                 result.put("messages", new Gson().toJson(list));
@@ -725,7 +771,9 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
         }
-        AudioPlayer player = new AudioPlayer(mContext);
+        if (player == null) {
+            player = new AudioPlayer(mContext);
+        }
         if(outputDevice == 0) {
             player.start(AudioManager.STREAM_VOICE_CALL);
         } else {
@@ -737,14 +785,15 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
     }
 
     public void isPlaying(String params[]) {
-        AudioPlayer player = new AudioPlayer(mContext);
+        if (player == null) {
+            player = new AudioPlayer(mContext);
+        }
         HashMap<String, Object> result = new HashMap<String, Object>();
         result.put("result", player.isPlaying());
         evaluateRootWindowScript(JsConst.CALLBACK_IS_PLAYING, getJSONFromMap(result));
     }
 
     public void playAudio(String params[]) {
-        AudioPlayer player = new AudioPlayer(mContext);
         String json = params[0];
         JSONObject jsonObject;
         String filePath = "";
@@ -755,17 +804,25 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
         }
-
-        player.setDataSource(getRealPath(filePath));
+        final String realPath = getRealPath(filePath);
+        final String tempPath = filePath ;
+        if (player == null) {
+            player = new AudioPlayer(mContext);
+        }
+        player.setDataSource(realPath);
         player.setOnPlayListener(new OnPlayListener() {
             @Override
             public void onPrepared() {
-                evaluateRootWindowScript(JsConst.CALLBACK_BEGAN_PLAY_AUDIO, null);
+                HashMap<String, Object> map = new HashMap<String, Object>();
+                map.put("filePath", tempPath);
+                evaluateRootWindowScript(JsConst.CALLBACK_BEGAN_PLAY_AUDIO, getJSONFromMap(map));
             }
 
             @Override
             public void onCompletion() {
-                evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_PLAY_AUDIO, null);
+                HashMap<String, Object> map = new HashMap<String, Object>();
+                map.put("filePath", tempPath);
+                evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_PLAY_AUDIO, getJSONFromMap(map));
             }
 
             @Override
@@ -783,7 +840,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
             }
         });
-        player.start(AudioManager.STREAM_VOICE_CALL); //默认由听筒播放
+        player.start(AudioManager.STREAM_VOICE_CALL);
     }
 
     /**
@@ -791,27 +848,32 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      * @param params
      */
     public void stopPlay(String params[]) {
-        AudioPlayer player = new AudioPlayer(mContext);
-        player.stop();
+        if (player == null) {
+            player = new AudioPlayer(mContext);
+        }
+        if (!player.isPlaying()) {
+            return;
+        }
         player.setOnPlayListener(new OnPlayListener() {
             @Override
             public void onPrepared() {
-
+                Log.i(TAG, "[stopPlay]----onPrepared----");
             }
 
             @Override
             public void onCompletion() {
+                Log.i(TAG, "[stopPlay]----onCompletion----");
                 evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_PLAY_AUDIO, null);
             }
 
             @Override
             public void onInterrupt() {
-
+                Log.i(TAG, "[stopPlay]----onInterrupt----");
             }
 
             @Override
             public void onError(String s) {
-
+                Log.i(TAG, "[onError]-----" + s);
             }
 
             @Override
@@ -819,6 +881,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
             }
         });
+        player.stop();
     }
     /**
      * 判断是否正在录制音频
@@ -921,7 +984,6 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         });
         recorder.startRecord();
     }
-
     //-----------------------------------------------------群组相关-----------------------------------------------
 
     /**
@@ -934,11 +996,12 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             public void onSuccess(List<Team> teams) {
                 HashMap<String, Object> result = new HashMap<String, Object>();
                 List<TeamVo> list = new ArrayList<TeamVo>();
-                for (Team team: teams) {
+                for (Team team : teams) {
                     TeamVo vo = DataUtil.trans2TeamVo(team);
                     list.add(vo);
                 }
-                result.put("teams", new Gson().toJson(list, new TypeToken<List<TeamVo>>(){}.getType()));
+                result.put("teams", new Gson().toJson(list, new TypeToken<List<TeamVo>>() {
+                }.getType()));
                 evaluateRootWindowScript(JsConst.CALLBACK_ALL_MY_TEAMS, getJSONFromMap(result));
             }
 
@@ -1080,18 +1143,23 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             String postscript = jsonObject.optString("postscript");
             String intro = jsonObject.optString("intro");
             String announcement = jsonObject.optString("announcement");
-            JSONArray users = jsonObject.optJSONArray("users");
+            String usersStr = jsonObject.optString("users");
+            JSONArray users = new JSONArray(usersStr);
+
             List<String> userIdList = new ArrayList<String>();
             if (users != null && users.length() > 0) {
                 int len = users.length();
                 for (int i = 0; i < len; i++) {
                     userIdList.add(users.getString(i));
                 }
-            } else {
-                SharedPreferencesHelper sharedPreferencesHelper = new SharedPreferencesHelper(mContext, "uexNIM");
-                String userAccount = sharedPreferencesHelper.getUserAccount();
+            }
+            SharedPreferencesHelper sharedPreferencesHelper = new SharedPreferencesHelper(mContext, "uexNIM");
+            String userAccount = sharedPreferencesHelper.getUserAccount();
+
+            if (!userIdList.contains(userAccount)) {
                 userIdList.add(userAccount); //把当前用户自己的id加进去
             }
+           // Log.i(TAG, "----------------->user:" + userIdList.get(0) + userIdList.get(1));
             HashMap<TeamFieldEnum, Serializable> fields = new HashMap<TeamFieldEnum, Serializable>();
             fields.put(TeamFieldEnum.Name, name);
             TeamTypeEnum teamType = TeamTypeEnum.Normal;
@@ -1756,7 +1824,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 public void onSuccess(List<TeamMember> teamMembers) {
                     List<TeamMemberVo> list = new ArrayList<TeamMemberVo>();
                     for (TeamMember teamMember : teamMembers) {
-                        TeamMemberVo vo = DataUtil.tans2TeamMemberVo(teamMember);
+                        TeamMemberVo vo = DataUtil.trans2TeamMemberVo(teamMember);
                         list.add(vo);
                     }
                     result.put("members", new Gson().toJson(list));
@@ -1966,11 +2034,46 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
     }
 
     public String getRealPath(String path){
-        String realPath=BUtility.makeRealPath(
+        String realPath = BUtility.makeRealPath(
                 BUtility.makeUrl(mBrwView.getCurrentUrl(), path),
                 mBrwView.getCurrentWidget().m_widgetPath,
                 mBrwView.getCurrentWidget().m_wgtType);
-        return realPath;
+        String fileName = path.substring(path.lastIndexOf("/") + 1, path.length());
+        Log.i(TAG, "getRealPath:" + fileName);
+
+        //先将assets文件写入到临时文件夹中
+        if (path.startsWith(BUtility.F_Widget_RES_SCHEMA)) {
+            //为res对应的文件生成一个临时文件到系统中
+            File dir = new File(Environment.getExternalStorageDirectory(),
+                    File.separator + TEMP_PATH);
+            if (!dir.exists()) {
+                dir.mkdirs();
+            } else {
+                //及时清理这个缓存文件夹中的数据
+                for (File file: dir.listFiles()) {
+                    file.delete();
+                }
+            }
+            File destFile = new File(dir, fileName);
+            try {
+                destFile.deleteOnExit();
+                destFile.createNewFile();
+            } catch (IOException e) {
+                Log.i(TAG, "[Create File]" +  e.getMessage());
+                return null;
+            }
+            if (realPath.startsWith("/data")){
+                CommonUtil.copyFile(new File(realPath), destFile);
+                return destFile.getAbsolutePath();
+            }else if( CommonUtil.saveFileFromAssetsToSystem(mContext, realPath, destFile)) {
+                return destFile.getAbsolutePath();
+            } else {
+                Log.i(TAG, "[getRealPath error]");
+                return null;
+            }
+        } else {
+            return realPath;
+        }
     }
 
 
@@ -2097,5 +2200,44 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
     @Override
     public void onUpdateRecentSession(List<RecentContact> contacts) {
 
+    }
+
+    @Override
+    public void onTeamRemoved(Team team) {
+        HashMap<String, Object> result = new HashMap<String, Object>();
+        TeamVo vo = DataUtil.trans2TeamVo(team);
+        result.put("team", new Gson().toJson(vo));
+        evaluateRootWindowScript(JsConst.ON_TEAM_REMOVED, getJSONFromMap(result));
+    }
+
+    @Override
+    public void onTeamUpdated(List<Team> teams) {
+
+        List<TeamVo> list = new ArrayList<TeamVo>();
+        for (Team team : teams) {
+            HashMap<String, Object> result = new HashMap<String, Object>();
+            result.put("team", new Gson().toJson(DataUtil.trans2TeamVo(team)));
+            evaluateRootWindowScript(JsConst.ON_TEAM_UPDATED, getJSONFromMap(result));
+        }
+
+     }
+
+    @Override
+    public void onTeamMemberChanged(List<TeamMember> members) {
+        HashMap<String, Object> result = new HashMap<String, Object>();
+        List<TeamMemberVo> list = new ArrayList<TeamMemberVo>();
+        for (TeamMember member : members) {
+            list.add(DataUtil.trans2TeamMemberVo(member));
+        }
+        result.put("data", new Gson().toJson(list));
+        evaluateRootWindowScript(JsConst.ON_TEAM_MEMBER_CHANGED, getJSONFromMap(result));
+    }
+
+    @Override
+    public void onSystemMessageRecieved(SystemMessage message) {
+        SystemMessageVo vo = DataUtil.trans2SystemMsgVo(message);
+        HashMap<String, Object> result = new HashMap<String, Object>();
+        result.put("notification", new Gson().toJson(vo));
+        evaluateRootWindowScript(JsConst.ON_RECIEVED_SYSTEM_NOTIFICATION, getJSONFromMap(result));
     }
 }

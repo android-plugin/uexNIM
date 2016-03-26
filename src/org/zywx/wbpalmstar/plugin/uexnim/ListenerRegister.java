@@ -9,9 +9,11 @@ import com.netease.nimlib.sdk.StatusCode;
 import com.netease.nimlib.sdk.auth.AuthServiceObserver;
 import com.netease.nimlib.sdk.auth.OnlineClient;
 import com.netease.nimlib.sdk.msg.MsgServiceObserve;
+import com.netease.nimlib.sdk.msg.SystemMessageObserver;
 import com.netease.nimlib.sdk.msg.model.AttachmentProgress;
 import com.netease.nimlib.sdk.msg.model.IMMessage;
 import com.netease.nimlib.sdk.msg.model.RecentContact;
+import com.netease.nimlib.sdk.msg.model.SystemMessage;
 import com.netease.nimlib.sdk.team.TeamServiceObserver;
 import com.netease.nimlib.sdk.team.model.Team;
 import com.netease.nimlib.sdk.team.model.TeamMember;
@@ -31,6 +33,7 @@ public class ListenerRegister {
         registerMsgObserver(register);
         registerTeamObservers(register);
         registerRecentContactListener(register); //注册最近联系人相关的监听
+        registerSystemMesgListener(register);
     }
 
     private void registerMsgObserver(boolean register) {
@@ -85,9 +88,9 @@ public class ListenerRegister {
         @Override
         public void onEvent(StatusCode statusCode) {
             if (StatusCode.KICK_BY_OTHER_CLIENT == statusCode) {
-                callback.onKick(1);
-            } else if (StatusCode.KICKOUT == statusCode) {
                 callback.onKick(3);
+            } else if (StatusCode.KICKOUT == statusCode) {
+                callback.onKick(1);
             }
         }
     };
@@ -106,9 +109,11 @@ public class ListenerRegister {
 
     // 群资料变动观察者通知。新建群和群更新的通知都通过该接口传递
     private Observer<List<Team>> teamUpdateObserver = new Observer<List<Team>>() {
+        //返回的是有更新的群资料
         @Override
         public void onEvent(List<Team> teams) {
             Log.i("onEvent", "--teamUpdateObserver:" + new Gson().toJson(teams));
+            callback.onTeamUpdated(teams);
         }
     };
 
@@ -118,14 +123,17 @@ public class ListenerRegister {
         public void onEvent(Team team) {
             // team的flag被更新，isMyTeam为false
             Log.i("onEvent", "--teamRemoveObserver:" + new Gson().toJson(team));
+            callback.onTeamRemoved(team);
         }
     };
 
     // 群成员资料变化观察者通知。可通过此接口更新缓存。
     private Observer<List<TeamMember>> memberUpdateObserver = new Observer<List<TeamMember>>() {
+        //返回的参数为有更新的群成员资料列表。
         @Override
         public void onEvent(List<TeamMember> members) {
             Log.i("onEvent", "--memberUpdateObserver:" + new Gson().toJson(members));
+            callback.onTeamMemberChanged(members);
         }
     };
 
@@ -143,6 +151,16 @@ public class ListenerRegister {
             // 1、根据sessionId判断是否是自己的消息
             // 2、更改内存中消息的状态
             // 3、刷新界面
+        }
+    };
+    private void registerSystemMesgListener(boolean register) {
+        NIMClient.getService(SystemMessageObserver.class)
+                .observeReceiveSystemMsg(systemMessageObserver, true);
+    }
+    private Observer<SystemMessage> systemMessageObserver = new Observer<SystemMessage>() {
+        @Override
+        public void onEvent(SystemMessage message) {
+            callback.onSystemMessageRecieved(message);
         }
     };
 
@@ -168,7 +186,12 @@ public class ListenerRegister {
         void onUpdateRecentSession(List<RecentContact> messages);
 
         void onKick(int code);
-
         void onMultiLoginClientsChanged(List<OnlineClient> onlineClients);
+        void onTeamRemoved(Team team);
+        void onTeamUpdated(List<Team> teams);
+
+        void onTeamMemberChanged(List<TeamMember> members);
+
+        void onSystemMessageRecieved(SystemMessage message);
     }
 }

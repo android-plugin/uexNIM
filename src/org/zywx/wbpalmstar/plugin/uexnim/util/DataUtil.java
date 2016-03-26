@@ -7,11 +7,13 @@ import com.netease.nimlib.sdk.msg.attachment.LocationAttachment;
 import com.netease.nimlib.sdk.msg.attachment.VideoAttachment;
 import com.netease.nimlib.sdk.msg.constant.MsgTypeEnum;
 import com.netease.nimlib.sdk.msg.model.IMMessage;
+import com.netease.nimlib.sdk.msg.model.SystemMessage;
 import com.netease.nimlib.sdk.team.model.Team;
 import com.netease.nimlib.sdk.team.model.TeamMember;
 
 import org.zywx.wbpalmstar.plugin.uexnim.vo.MessageVo;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.OnlineClientVo;
+import org.zywx.wbpalmstar.plugin.uexnim.vo.SystemMessageVo;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.TeamMemberVo;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.TeamVo;
 
@@ -33,7 +35,7 @@ public class DataUtil {
         return vo;
     }
 
-    public static TeamMemberVo tans2TeamMemberVo(TeamMember teamMember) {
+    public static TeamMemberVo trans2TeamMemberVo(TeamMember teamMember) {
         TeamMemberVo vo = new TeamMemberVo();
         vo.setTeamId(teamMember.getTid());
         vo.setUserId(teamMember.getAccount());
@@ -90,6 +92,16 @@ public class DataUtil {
         vo.setOs(client.getOs());
         vo.setTimestamp(client.getLoginTime());
         vo.setType(client.getClientType());
+        return vo;
+    }
+
+    public static SystemMessageVo trans2SystemMsgVo(SystemMessage message) {
+        SystemMessageVo vo = new SystemMessageVo();
+        vo.setType(message.getType().getValue());
+        vo.setRead(message.isUnread());
+        vo.setSourceID(message.getFromAccount());
+        vo.setTargetID(message.getTargetId());
+        vo.setTimestamp(message.getTime());
         return vo;
     }
 }

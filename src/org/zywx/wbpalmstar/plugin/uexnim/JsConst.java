@@ -53,4 +53,8 @@ public class JsConst {
     public static final String CALLBACK_BEGAN_RECORD_AUDIO = "uexNIM.cbBeganRecordAudio" ;
     public static final String CALLBACK_COMPLETED_RECORD_AUDIO = "uexNIM.cbCompletedRecordAudio" ;
 
+    public static final String ON_TEAM_REMOVED = "uexNIM.onTeamRemoved";
+    public static final String ON_TEAM_UPDATED = "uexNIM.onTeamUpdated";
+    public static final String ON_TEAM_MEMBER_CHANGED = "uexNIM.onTeamMemberChanged";
+    public static final String ON_RECIEVED_SYSTEM_NOTIFICATION = "uexNIM.onReceiveSystemNotification";
 }
