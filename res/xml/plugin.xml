@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <uexplugins>
     <plugin
-        className="org.zywx.wbpalmstar.plugin.uexnim.EUExNIM" uexName="uexNIM" >
+        className="org.zywx.wbpalmstar.plugin.uexnim.EUExNIM"
+        uexName="uexNIM"
+        global="true">
         <method name = "registerApp" />
         <method name = "login" />
         <method name = "logout" />
@@ -22,6 +24,8 @@
         <method name="stopPlay" />
         <method name="isRecording" />
         <method name="recordAudioForDuration" />
+        <method name="stopRecord"/>
+        <method name="cancelRecord"/>
 
 
         <method name = "allRecentSession" />
@@ -52,6 +56,38 @@
         <method name="dismissTeam"/>
         <method name="updateNotifyStateForTeam"/>
         <method name="notifyForNewMsgForTeam"/>
+
+        <method name="fetchSystemNotifications" />
+        <method name="allNotificationsUnreadCount" />
+        <method name="deleteAllNotifications" />
+        <method name="markAllNotificationsAsRead" />
+        <method name="sendCustomNotification" />
+        <method name="userInfo" />
+        <method name="fetchUserInfos" />
+        <method name="updateMyUserInfo" />
+        <!--用户关系托管-->
+        <method name="myFriends" />
+        <method name="requestFriend" />
+        <method name="deleteFriend" />
+        <method name="myBlackList" />
+        <method name="addToBlackList" />
+        <method name="removeFromBlackBlackList" />
+        <method name="isUserInBlackList" />
+        <method name="myMuteUserList" />
+        <method name="updateNotifyStateForUser" />
+        <method name="notifyForNewMsgForUser" />
+
+        <method name="enterChatRoom"/>
+        <method name="exitChatRoom"/>
+        <method name="getChatRoomHistoryMsg"/>
+        <method name="getChatRoomInfo"/>
+        <method name="getChatRoomMembers"/>
+        <method name="getChatRoomMembersByIds"/>
+        <method name="addUserToBlackList"/>
+        <method name="muteUser"/>
+        <method name="setAdmin"/>
+        <method name="setNormal"/>
+        <method name="kickMemberFromChatRoom"/>
 
     </plugin>
 </uexplugins>

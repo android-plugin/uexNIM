@@ -1,31 +1,40 @@
 package org.zywx.wbpalmstar.plugin.uexnim.vo;
 
-import com.netease.nimlib.sdk.msg.constant.MsgTypeEnum;
-import com.netease.nimlib.sdk.msg.constant.SessionTypeEnum;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Created by Fred on 2016/3/23.
  */
 public class MessageVo {
     private String messageId;
-    private MsgTypeEnum messageType;
+    private Integer messageType;
     private String from;
     private String text;
-    private long timestamp;
+    private Long timestamp;
     private String sessionId;
-    private SessionTypeEnum sessionType;
+    private int sessionType;
     private String path;
     private String url;
-    private long fileLength;
+    private Long fileLength;
     private String thumbPath;
     private String thumbUrl;
-    private long duration;
+    private Long duration;
 
     private String coverUrl;
     private String coverPath;
     private String title; //位置标题(位置消息）
-    private double latitude; //纬度(位置消息）
-    private double longitude; //经度(位置消息）
+    private Double latitude; //纬度(位置消息）
+    private Double longitude; //经度(位置消息）
+    private Integer eventType; //如果是通知类型事件会有事件类型
+    private String operator; //通知的操作者
+    private List<String> targets; //通知的被操作者
+
+    private Integer notificationType; //如果是通知类型的消息，此处代表通知类型
+    private Map<String, Object> ext; //扩展字段
+    private String displayName;
+
+
     public String getMessageId() {
         return messageId;
     }
@@ -34,11 +43,11 @@ public class MessageVo {
         this.messageId = messageId;
     }
 
-    public MsgTypeEnum getMessageType() {
+    public Integer getMessageType() {
         return messageType;
     }
 
-    public void setMessageType(MsgTypeEnum messageType) {
+    public void setMessageType(Integer messageType) {
         this.messageType = messageType;
     }
 
@@ -58,11 +67,11 @@ public class MessageVo {
         this.text = text;
     }
 
-    public long getTimestamp() {
+    public Long getTimestamp() {
         return timestamp;
     }
 
-    public void setTimestamp(long timestamp) {
+    public void setTimestamp(Long timestamp) {
         this.timestamp = timestamp;
     }
 
@@ -74,11 +83,11 @@ public class MessageVo {
         this.sessionId = sessionId;
     }
 
-    public SessionTypeEnum getSessionType() {
+    public int getSessionType() {
         return sessionType;
     }
 
-    public void setSessionType(SessionTypeEnum sessionType) {
+    public void setSessionType(int sessionType) {
         this.sessionType = sessionType;
     }
 
@@ -90,19 +99,19 @@ public class MessageVo {
         this.url = url;
     }
 
-    public long getFileLength() {
+    public Long getFileLength() {
         return fileLength;
     }
 
-    public void setFileLength(long fileLength) {
+    public void setFileLength(Long fileLength) {
         this.fileLength = fileLength;
     }
 
-    public long getDuration() {
+    public Long getDuration() {
         return duration;
     }
 
-    public void setDuration(long duration) {
+    public void setDuration(Long duration) {
         this.duration = duration;
     }
 
@@ -154,19 +163,67 @@ public class MessageVo {
         this.title = title;
     }
 
-    public double getLatitude() {
+    public Double getLatitude() {
         return latitude;
     }
 
-    public void setLatitude(double latitude) {
+    public void setLatitude(Double latitude) {
         this.latitude = latitude;
     }
 
-    public double getLongitude() {
+    public Double getLongitude() {
         return longitude;
     }
 
-    public void setLongitude(double longitude) {
+    public void setLongitude(Double longitude) {
         this.longitude = longitude;
+    }
+
+    public Integer getEventType() {
+        return eventType;
+    }
+
+    public void setEventType(Integer eventType) {
+        this.eventType = eventType;
+    }
+
+    public String getOperator() {
+        return operator;
+    }
+
+    public void setOperator(String operator) {
+        this.operator = operator;
+    }
+
+    public List<String> getTargets() {
+        return targets;
+    }
+
+    public void setTargets(List<String> targets) {
+        this.targets = targets;
+    }
+
+    public Integer getNotificationType() {
+        return notificationType;
+    }
+
+    public void setNotificationType(Integer notificationType) {
+        this.notificationType = notificationType;
+    }
+
+    public Map<String, Object> getExt() {
+        return ext;
+    }
+
+    public void setExt(Map<String, Object> ext) {
+        this.ext = ext;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
     }
 }

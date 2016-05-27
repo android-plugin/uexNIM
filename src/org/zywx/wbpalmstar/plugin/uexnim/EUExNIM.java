@@ -14,7 +14,6 @@ import android.util.Log;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import com.netease.nimlib.sdk.AbortableFuture;
 import com.netease.nimlib.sdk.NIMClient;
 import com.netease.nimlib.sdk.NimStrings;
@@ -28,6 +27,19 @@ import com.netease.nimlib.sdk.auth.AuthService;
 import com.netease.nimlib.sdk.auth.AuthServiceObserver;
 import com.netease.nimlib.sdk.auth.LoginInfo;
 import com.netease.nimlib.sdk.auth.OnlineClient;
+import com.netease.nimlib.sdk.chatroom.ChatRoomMessageBuilder;
+import com.netease.nimlib.sdk.chatroom.ChatRoomService;
+import com.netease.nimlib.sdk.chatroom.constant.MemberQueryType;
+import com.netease.nimlib.sdk.chatroom.model.ChatRoomInfo;
+import com.netease.nimlib.sdk.chatroom.model.ChatRoomKickOutEvent;
+import com.netease.nimlib.sdk.chatroom.model.ChatRoomMember;
+import com.netease.nimlib.sdk.chatroom.model.ChatRoomMessage;
+import com.netease.nimlib.sdk.chatroom.model.ChatRoomStatusChangeData;
+import com.netease.nimlib.sdk.chatroom.model.EnterChatRoomData;
+import com.netease.nimlib.sdk.chatroom.model.MemberOption;
+import com.netease.nimlib.sdk.friend.FriendService;
+import com.netease.nimlib.sdk.friend.constant.VerifyType;
+import com.netease.nimlib.sdk.friend.model.AddFriendData;
 import com.netease.nimlib.sdk.media.player.AudioPlayer;
 import com.netease.nimlib.sdk.media.player.OnPlayListener;
 import com.netease.nimlib.sdk.media.record.AudioRecorder;
@@ -35,12 +47,15 @@ import com.netease.nimlib.sdk.media.record.IAudioRecordCallback;
 import com.netease.nimlib.sdk.media.record.RecordType;
 import com.netease.nimlib.sdk.msg.MessageBuilder;
 import com.netease.nimlib.sdk.msg.MsgService;
+import com.netease.nimlib.sdk.msg.SystemMessageService;
 import com.netease.nimlib.sdk.msg.attachment.AudioAttachment;
 import com.netease.nimlib.sdk.msg.attachment.ImageAttachment;
 import com.netease.nimlib.sdk.msg.attachment.LocationAttachment;
 import com.netease.nimlib.sdk.msg.attachment.VideoAttachment;
 import com.netease.nimlib.sdk.msg.constant.MsgTypeEnum;
 import com.netease.nimlib.sdk.msg.constant.SessionTypeEnum;
+import com.netease.nimlib.sdk.msg.model.CustomNotification;
+import com.netease.nimlib.sdk.msg.model.CustomNotificationConfig;
 import com.netease.nimlib.sdk.msg.model.IMMessage;
 import com.netease.nimlib.sdk.msg.model.RecentContact;
 import com.netease.nimlib.sdk.msg.model.SystemMessage;
@@ -51,6 +66,9 @@ import com.netease.nimlib.sdk.team.constant.VerifyTypeEnum;
 import com.netease.nimlib.sdk.team.model.Team;
 import com.netease.nimlib.sdk.team.model.TeamMember;
 import com.netease.nimlib.sdk.uinfo.UserInfoProvider;
+import com.netease.nimlib.sdk.uinfo.UserService;
+import com.netease.nimlib.sdk.uinfo.constant.UserInfoFieldEnum;
+import com.netease.nimlib.sdk.uinfo.model.NimUserInfo;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -65,12 +83,17 @@ import org.zywx.wbpalmstar.plugin.uexnim.util.DataUtil;
 import org.zywx.wbpalmstar.plugin.uexnim.util.MD5;
 import org.zywx.wbpalmstar.plugin.uexnim.util.NIMConstant;
 import org.zywx.wbpalmstar.plugin.uexnim.util.SharedPreferencesHelper;
+import org.zywx.wbpalmstar.plugin.uexnim.vo.ChatRoomInfoVo;
+import org.zywx.wbpalmstar.plugin.uexnim.vo.ChatRoomMemberVo;
+import org.zywx.wbpalmstar.plugin.uexnim.vo.ChatRoomMessageVo;
+import org.zywx.wbpalmstar.plugin.uexnim.vo.CustomNotificationVo;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.MessageVo;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.OnlineClientVo;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.RecentSessionVo;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.SystemMessageVo;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.TeamMemberVo;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.TeamVo;
+import org.zywx.wbpalmstar.plugin.uexnim.vo.UserInfoVo;
 import org.zywx.wbpalmstar.widgetone.WidgetOneApplication;
 
 import java.io.File;
@@ -78,6 +101,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -88,6 +112,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
     private final String MSG_TEAM_ID_EMPTY = "teamId can not be null";
     private ResoureFinder finder;
     private AudioPlayer player;
+    private AudioRecorder audioRecorder;
     private String TEMP_PATH = "nim_temp";
 
     public EUExNIM(Context context, EBrowserView eBrowserView) {
@@ -350,6 +375,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String sessionId = null;
         String content = null;
         int sessionType = 0;
+        Map<String, Object> ext;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -359,26 +385,39 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 Toast.makeText(mContext, "sessionId is empty !", Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (sessionType != 0 && sessionType != 1) {
+            if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 Toast.makeText(mContext, "Invalid sessionType !", Toast.LENGTH_SHORT).show();
                 return;
             }
+            JSONObject extObj = jsonObject.optJSONObject("ext"); //扩展字段
+            ext = getMapFromJSON(extObj);
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
             return;
         }
-        final IMMessage message = MessageBuilder.createTextMessage(sessionId, SessionTypeEnum.typeOfValue(sessionType), content);
-        Log.i(TAG, "message id:" + message.getUuid());
-        willSendMsgCallback(sessionId, content, sessionType, message);
-        Log.i("messageId", message.getUuid());
-        NIMClient.getService(MsgService.class).sendMessage(message, false).setCallback(sendMsgCallback);
+        //如果是聊天室消息
+        if (sessionType == 2) {
+            ChatRoomMessage  message = ChatRoomMessageBuilder.createChatRoomTextMessage(sessionId, content);
+            if (ext != null) {
+                message.setRemoteExtension(ext);
+            }
+            willSendMsgCallback(sessionId, content, NIMConstant.MESSAGE_TYPE_TEXT, sessionType, message);
+            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+        } else {
+            IMMessage  message = MessageBuilder.createTextMessage(sessionId, SessionTypeEnum.typeOfValue(sessionType), content);
+            if (ext != null) {
+                message.setRemoteExtension(ext);
+            }
+            willSendMsgCallback(sessionId, content, NIMConstant.MESSAGE_TYPE_TEXT, sessionType, message);
+            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+        }
     }
 
-    private void willSendMsgCallback(String sessionId, String content, int sessionType, IMMessage message) {
+    private void willSendMsgCallback(String sessionId, String content, int messageType, int sessionType, IMMessage message) {
         HashMap<String, Object> map = new HashMap<String, Object>();
         map.put(NIMConstant.TEXT_MESSAGE_ID, message.getUuid());
-        map.put(NIMConstant.TEXT_MESSAGE_TYPE, NIMConstant.MESSAGE_TYPE_TEXT);
+        map.put(NIMConstant.TEXT_MESSAGE_TYPE, messageType);
         map.put(NIMConstant.TEXT_SESSION_ID, sessionId);
         map.put(NIMConstant.TEXT_SESSION_TYPE, sessionType);
         if (content != null) {
@@ -397,34 +436,54 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String sessionId = null;
         String filePath = null;
         int sessionType = 0;
+        String displayName;
+        Map<String, Object> ext;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
             sessionType = jsonObject.optInt("sessionType");
             filePath = jsonObject.optString("filePath");
+            displayName = jsonObject.optString("displayName");
             if (TextUtils.isEmpty(sessionId) || TextUtils.isEmpty(filePath)) {
                 Toast.makeText(mContext, "sessionId or filePath is empty !", Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (sessionType != 0 && sessionType != 1) {
+            if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 Toast.makeText(mContext, "Invalid sessionType !", Toast.LENGTH_SHORT).show();
                 return;
             }
-
+            JSONObject extObj = jsonObject.optJSONObject("ext"); //扩展字段
+            ext = getMapFromJSON(extObj);
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
             return;
         }
-        // 创建图片消息
-        final IMMessage message = MessageBuilder.createImageMessage(
-                sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
-                SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
-                new File(getRealPath(filePath)), // 图片文件对象
-                null // 文件显示名字，如果第三方 APP 不关注，可以为 null
-        );
-        NIMClient.getService(MsgService.class).sendMessage(message, false).setCallback(sendMsgCallback);
-        willSendMsgCallback(sessionId, null, sessionType, message);
+        if (sessionType == 2) {
+            // 创建图片消息
+            ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomImageMessage(sessionId, new File(getRealPath(filePath)), displayName);
+            if (ext != null) {
+                message.setRemoteExtension(ext);
+            }
+            willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_IMAGE, sessionType, message);
+            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+
+        } else {
+            // 创建图片消息
+            IMMessage message = MessageBuilder.createImageMessage(
+                     sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
+                     SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
+                     new File(getRealPath(filePath)), // 图片文件对象
+                     null // 文件显示名字，如果第三方 APP 不关注，可以为 null
+            );
+            if (ext != null) {
+                message.setRemoteExtension(ext);
+            }
+            willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_IMAGE, sessionType, message);
+            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+        }
+
+
     }
 
 
@@ -466,6 +525,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         double longitude = 0.0;
         int sessionType = 0;
         String title = "";
+        Map<String, Object> ext;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -473,31 +533,49 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             latitude = jsonObject.optDouble("latitude");
             longitude = jsonObject.optDouble("longitude");
             title = jsonObject.optString("title");
-
             if (TextUtils.isEmpty(sessionId)) {
                 Toast.makeText(mContext, "sessionId is empty !", Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (sessionType != 0 && sessionType != 1) {
+            if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 Toast.makeText(mContext, "Invalid sessionType !", Toast.LENGTH_SHORT).show();
                 return;
             }
+            JSONObject extObj = jsonObject.optJSONObject("ext"); //扩展字段
+            ext = getMapFromJSON(extObj);
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
             return;
         }
-        // 发送其他类型的消息代码类似，演示如下
-        // 创建地理位置消息
-        IMMessage message = MessageBuilder.createLocationMessage(
-                sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
-                SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
-                latitude, // 纬度
-                longitude, // 经度
-                title // 地址信息描述
-        );
-        NIMClient.getService(MsgService.class).sendMessage(message, false).setCallback(sendMsgCallback);
+
+        if (sessionType == 2) {
+            // 创建地理位置消息
+            ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomLocationMessage(sessionId, latitude, longitude, title);
+            if (ext != null) {
+                message.setRemoteExtension(ext);
+            }
+            willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_IMAGE, sessionType, message);
+            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+        } else {
+            // 发送其他类型的消息代码类似，演示如下
+            // 创建地理位置消息
+            IMMessage message = MessageBuilder.createLocationMessage(
+                    sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
+                    SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
+                    latitude, // 纬度
+                    longitude, // 经度
+                    title // 地址信息描述
+            );
+            if (ext != null) {
+                message.setRemoteExtension(ext);
+            }
+            willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_LOCATION, sessionType, message);
+            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+        }
     }
+
+
     //发送音频
     public void sendAudio(String params[]) {
         if (params == null || params.length < 1) {
@@ -509,6 +587,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String sessionId = null;
         String filePath = null;
         int sessionType = 0;
+        Map<String, Object> ext;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -518,10 +597,12 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 Toast.makeText(mContext, "sessionId or filePath is empty !", Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (sessionType != 0 && sessionType != 1) {
+            if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 Toast.makeText(mContext, "Invalid sessionType !", Toast.LENGTH_SHORT).show();
                 return;
             }
+            JSONObject extObj = jsonObject.optJSONObject("ext"); //扩展字段
+            ext = getMapFromJSON(extObj);
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
@@ -531,14 +612,27 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         File file = new File(realPath);
         MediaPlayer mp = MediaPlayer.create(mContext, Uri.parse(realPath));
         int duration = mp.getDuration();
-        // 创建音频消息
-        IMMessage message = MessageBuilder.createAudioMessage(
-                sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
-                SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
-                file, // 音频文件
-                duration // 音频持续时间，单位是ms
-        );
-        NIMClient.getService(MsgService.class).sendMessage(message, false);
+        if (sessionType == 2) {
+            // 创建音频消息
+            ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomAudioMessage(sessionId, file, duration);
+            if (ext != null) {
+                message.setRemoteExtension(ext);
+            }
+            willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_AUDIO, sessionType, message);
+            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+        } else {
+            IMMessage  message = MessageBuilder.createAudioMessage(
+                    sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
+                    SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
+                    file, // 音频文件
+                    duration // 音频持续时间，单位是ms
+            );
+            if (ext != null) {
+                message.setRemoteExtension(ext);
+            }
+            willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_AUDIO, sessionType, message);
+            NIMClient.getService(MsgService.class).sendMessage(message, true);
+        }
     }
 
     //发送视频
@@ -552,19 +646,24 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String sessionId = null;
         String filePath = null;
         int sessionType = 0;
+        String displayName;
+        Map<String, Object> ext;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
             sessionType = jsonObject.optInt("sessionType");
             filePath = jsonObject.optString("filePath");
+            displayName = jsonObject.optString("displayName");
             if (TextUtils.isEmpty(sessionId) || TextUtils.isEmpty(filePath)) {
                 Toast.makeText(mContext, "sessionId or filePath is empty !", Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (sessionType != 0 && sessionType != 1) {
+            if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 Toast.makeText(mContext, "Invalid sessionType !", Toast.LENGTH_SHORT).show();
                 return;
             }
+            JSONObject extObj = jsonObject.optJSONObject("ext"); //扩展字段
+            ext = getMapFromJSON(extObj);
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
@@ -576,17 +675,28 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         int duration = mp.getDuration();
         int width = mp.getVideoWidth();
         int height = mp.getVideoHeight();
-        // 创建视频消息
-        IMMessage message = MessageBuilder.createVideoMessage(
-                sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
-                SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
-                file, // 视频文件
-                duration, // 视频持续时间
-                width, // 视频宽度
-                height, // 视频高度
-                null // 视频显示名，可为空
-        );
-        NIMClient.getService(MsgService.class).sendMessage(message, false);
+        if (sessionType == 2) {
+            ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomVideoMessage(sessionId, file, duration, width, height, displayName);
+            if (ext != null) {
+                message.setRemoteExtension(ext);
+            }
+            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+        } else {
+            // 创建视频消息
+            IMMessage message = MessageBuilder.createVideoMessage(
+                    sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
+                    SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
+                    file, // 视频文件
+                    duration, // 视频持续时间
+                    width, // 视频宽度
+                    height, // 视频高度
+                    displayName // 视频显示名，可为空
+            );
+            if (ext != null) {
+                message.setRemoteExtension(ext);
+            }
+            NIMClient.getService(MsgService.class).sendMessage(message, true);
+        }
     }
 
     //发送文件
@@ -600,31 +710,47 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String sessionId = null;
         String filePath = null;
         int sessionType = 0;
+        String displayName;
+        Map<String, Object> ext;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
             sessionType = jsonObject.optInt("sessionType");
             filePath = jsonObject.optString("filePath");
+            displayName = jsonObject.optString("displayName");
             if (TextUtils.isEmpty(sessionId) || TextUtils.isEmpty(filePath)) {
                 Toast.makeText(mContext, "sessionId or filePath is empty !", Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (sessionType != 0 && sessionType != 1) {
+            if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 Toast.makeText(mContext, "Invalid sessionType !", Toast.LENGTH_SHORT).show();
                 return;
             }
+            JSONObject extObj = jsonObject.optJSONObject("ext"); //扩展字段
+            ext = getMapFromJSON(extObj);
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
             return;
         }
         File file = new File(getRealPath(filePath));
-        IMMessage message = MessageBuilder.createFileMessage(
-                sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
-                SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
-                file,
-                file.getName());
-        NIMClient.getService(MsgService.class).sendMessage(message, false);
+        if (sessionType == 2) {
+            ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomFileMessage(sessionId, file, displayName);
+            if (ext != null) {
+                message.setRemoteExtension(ext);
+            }
+            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+        } else {
+            IMMessage message = MessageBuilder.createFileMessage(
+                    sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
+                    SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
+                    file,
+                    displayName);
+            if (ext != null) {
+                message.setRemoteExtension(ext);
+            }
+            NIMClient.getService(MsgService.class).sendMessage(message, true);
+        }
     }
 
     //获取最近会话
@@ -644,9 +770,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     RecentSessionVo recentVo = new RecentSessionVo();
                     recentVo.setSessionTypeEnum(recent.getSessionType());
                     recentVo.setUnreadCount(recent.getUnreadCount());
-
-                    MsgTypeEnum msgTypeEnum= recent.getMsgType();
-
+                    MsgTypeEnum msgTypeEnum = recent.getMsgType();
                     MessageVo vo = new MessageVo();
                     vo.setMessageId(recent.getRecentMessageId());
                     vo.setFrom(recent.getFromAccount());
@@ -673,7 +797,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                         vo.setFileLength(attach.getSize());
                         vo.setPath(attach.getPathForSave());
                         vo.setUrl(attach.getUrl());
-                        vo.setCoverUrl(attach.getThumbPathForSave() );
+                        vo.setCoverUrl(attach.getThumbPathForSave());
                     } else if (msgTypeEnum == MsgTypeEnum.location) {
                         LocationAttachment attach = (LocationAttachment) recent.getAttachment();
                         vo.setTitle(attach.getAddress());
@@ -888,44 +1012,17 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      * @param params
      */
     public void isRecording(String params[]) {
-        AudioRecorder record = new AudioRecorder(mContext, RecordType.AAC, 100, new IAudioRecordCallback() {
-            @Override
-            public void onRecordReady() {
-
-            }
-
-            @Override
-            public void onRecordStart(File file, RecordType recordType) {
-
-            }
-
-            @Override
-            public void onRecordSuccess(File file, long l, RecordType recordType) {
-
-            }
-
-            @Override
-            public void onRecordFail() {
-
-            }
-
-            @Override
-            public void onRecordCancel() {
-
-            }
-
-            @Override
-            public void onRecordReachedMaxTime(int i) {
-
-            }
-        });
         HashMap<String, Object> result = new HashMap<String, Object>();
-        result.put("result", record.isRecording());
+        if (audioRecorder != null) {
+            result.put("result", audioRecorder.isRecording());
+        } else {
+            result.put("result", false);
+        }
         evaluateRootWindowScript(JsConst.CALLBACK_IS_RECORDING, getJSONFromMap(result));
     }
 
     /**
-     *
+     * 录音
      * @param params
      */
     public void recordAudioForDuration(String params[]) {
@@ -936,7 +1033,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String json = params[0];
         JSONObject jsonObject;
         int duration = 0;
-        float updateTime;
+        float updateTime;  //当前Android不支持
         final HashMap<String, Object> result = new HashMap<String, Object>();
         try {
             jsonObject = new JSONObject(json);
@@ -946,44 +1043,73 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
         }
-        AudioRecorder recorder = new AudioRecorder(mContext, RecordType.AAC, duration, new IAudioRecordCallback() {
-            private File audioFile = null;
-            @Override
-            public void onRecordReady() {
+        if (audioRecorder == null) {
+            audioRecorder = getAudioRecorder(duration, new IAudioRecordCallback() {
+                private File audioFile = null;
+                @Override
+                public void onRecordReady() {
 
-            }
+                }
 
-            @Override
-            public void onRecordStart(File file, RecordType recordType) {
-                audioFile = file;
-                result.put("filePath", file.getAbsolutePath());
-                evaluateRootWindowScript(JsConst.CALLBACK_BEGAN_RECORD_AUDIO,getJSONFromMap(result));
-            }
+                @Override
+                public void onRecordStart(File file, RecordType recordType) {
+                    audioFile = file;
+                    result.put("filePath", file.getAbsolutePath());
+                    evaluateRootWindowScript(JsConst.CALLBACK_BEGAN_RECORD_AUDIO,getJSONFromMap(result));
+                }
 
-            @Override
-            public void onRecordSuccess(File file, long l, RecordType recordType) {
-               Log.i(TAG, "[record audio success]");
+                @Override
+                public void onRecordSuccess(File file, long l, RecordType recordType) {
+                    Log.i(TAG, "[record audio success]");
+                    evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_RECORD_AUDIO, getJSONFromMap(result));
+                }
 
-            }
+                @Override
+                public void onRecordFail() {
 
-            @Override
-            public void onRecordFail() {
+                }
 
-            }
+                @Override
+                public void onRecordCancel() {
+                    evaluateRootWindowScript(JsConst.CALLBACK_CANCEL_RECORD_AUTIO, null);
+                }
 
-            @Override
-            public void onRecordCancel() {
-
-            }
-
-            @Override
-            public void onRecordReachedMaxTime(int i) {
-                result.put("filePath", audioFile.getAbsolutePath());
-                evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_RECORD_AUDIO,getJSONFromMap(result));
-            }
-        });
-        recorder.startRecord();
+                @Override
+                public void onRecordReachedMaxTime(int i) {
+                    result.put("filePath", audioFile.getAbsolutePath());
+                    evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_RECORD_AUDIO,getJSONFromMap(result));
+                }
+            });
+        }
+        audioRecorder.startRecord();
     }
+
+    private AudioRecorder getAudioRecorder(int maxDuration, IAudioRecordCallback callback) {
+        if (audioRecorder == null) {
+            return new AudioRecorder(mContext, RecordType.AAC, maxDuration,  callback);
+        }
+        return audioRecorder;
+    }
+    /**
+     * 停止录制音频
+     * @param params
+     */
+    public void stopRecord(String params[]) {
+        if (audioRecorder != null) {
+            audioRecorder.completeRecord(false);//停止录音
+        }
+    }
+
+    /**
+     * 取消录音
+     * @param params
+     */
+    public void cancelRecord(String params[]){
+        if (audioRecorder != null) {
+            audioRecorder.completeRecord(true);
+        }
+    }
+
     //-----------------------------------------------------群组相关-----------------------------------------------
 
     /**
@@ -1000,9 +1126,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     TeamVo vo = DataUtil.trans2TeamVo(team);
                     list.add(vo);
                 }
-                result.put("teams", new Gson().toJson(list, new TypeToken<List<TeamVo>>() {
-                }.getType()));
-                evaluateRootWindowScript(JsConst.CALLBACK_ALL_MY_TEAMS, getJSONFromMap(result));
+                result.put("teams", list);
+                evaluateRootWindowScript(JsConst.CALLBACK_ALL_MY_TEAMS, new Gson().toJson(result));
             }
 
             @Override
@@ -1049,28 +1174,17 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
-        NIMClient.getService(TeamService.class).queryTeam(teamId).setCallback(new RequestCallback<Team>() {
-            @Override
-            public void onSuccess(Team team) {
-                TeamVo vo = DataUtil.trans2TeamVo(team);
-                result.put("team", new Gson().toJson(vo));
-                evaluateRootWindowScript(JsConst.CALLBACK_TEAM_BY_ID, getJSONFromMap(result));
-            }
 
-            @Override
-            public void onFailed(int i) {
-                Log.i(TAG, "[Query Team By Id Failed] error:" + i);
-                result.put("error", i);
-                evaluateRootWindowScript(JsConst.CALLBACK_TEAM_BY_ID, getJSONFromMap(result));
-            }
-
-            @Override
-            public void onException(Throwable throwable) {
-                Log.i(TAG, "[Query Team By Id Exception] error:" + throwable.getMessage());
-                result.put("error", throwable.getMessage());
-                evaluateRootWindowScript(JsConst.CALLBACK_TEAM_BY_ID, getJSONFromMap(result));
-            }
-        });
+        NIMClient.getService(TeamService.class).queryTeam(teamId).setCallback(
+                new RequestCallbackTemplate<Team>("teamById", JsConst.CALLBACK_TEAM_BY_ID, new CustomDataUtil<Team>() {
+                    @Override
+                    public String getDataStr(Team team) {
+                        HashMap<String, Object> result = new HashMap<String, Object>();
+                        TeamVo vo = DataUtil.trans2TeamVo(team);
+                        result.put("team", vo);
+                        return new Gson().toJson(result);
+                    }
+                }));
     }
 
     /**
@@ -1102,8 +1216,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             @Override
             public void onSuccess(Team team) {
                 TeamVo vo = DataUtil.trans2TeamVo(team);
-                result.put("team", new Gson().toJson(vo));
-                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_INFO, getJSONFromMap(result));
+                result.put("team", vo);
+                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_INFO, new Gson().toJson(result));
             }
 
             @Override
@@ -1159,7 +1273,6 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (!userIdList.contains(userAccount)) {
                 userIdList.add(userAccount); //把当前用户自己的id加进去
             }
-           // Log.i(TAG, "----------------->user:" + userIdList.get(0) + userIdList.get(1));
             HashMap<TeamFieldEnum, Serializable> fields = new HashMap<TeamFieldEnum, Serializable>();
             fields.put(TeamFieldEnum.Name, name);
             TeamTypeEnum teamType = TeamTypeEnum.Normal;
@@ -1303,6 +1416,10 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
     }
 
+    /**
+     * 拒绝别人的加群邀请
+     * @param params
+     */
     public void rejectInviteWithTeam(String params[]) {
         if (params == null || params.length < 1) {
             errorCallback(0, 0, "error params!");
@@ -1827,8 +1944,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                         TeamMemberVo vo = DataUtil.trans2TeamMemberVo(teamMember);
                         list.add(vo);
                     }
-                    result.put("members", new Gson().toJson(list));
-                    evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_MEMBERS, getJSONFromMap(result));
+                    result.put("members", list);
+                    evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_MEMBERS, new Gson().toJson(result));
                 }
 
                 @Override
@@ -2032,6 +2149,957 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             Log.i(TAG, e.getMessage());
         }
     }
+    //---------------------------系统消息-----------------------
+
+    /**
+     * 获取本地存储的内置系统通知
+     * @param params
+     */
+    public void fetchSystemNotifications(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            int limit = jsonObject.optInt("limit", 10); //默认10条
+            List<SystemMessage> list = NIMClient.getService(SystemMessageService.class).querySystemMessagesBlock(0, limit);
+            List<SystemMessageVo> voList = new ArrayList<SystemMessageVo>();
+            if (list != null && list.size() > 0) {
+                for (SystemMessage msg : list) {
+                    voList.add(DataUtil.trans2SystemMsgVo(msg));
+                }
+            }
+            result.put("notifications", voList);
+            evaluateRootWindowScript(JsConst.CALLBACK_FETCH_SYSTEM_NOTIFICATION, new Gson().toJson(result));
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+        }
+    }
+
+    /**
+     * 获取本地存储的内置系统未读数
+     * @param params
+     */
+    public void allNotificationsUnreadCount(String params[]) {
+        int count = NIMClient.getService(SystemMessageService.class).querySystemMessageUnreadCountBlock();
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        result.put("count", count);
+        evaluateRootWindowScript(JsConst.CALLBACK_ALL_NOTIFICATION_UNREAD_COUNT, getJSONFromMap(result));
+    }
+
+    /**
+     * 删除本地存储的全部内置系统通知
+     * @param params
+     */
+    public void deleteAllNotifications(String params[]) {
+        NIMClient.getService(SystemMessageService.class).clearSystemMessages();
+    }
+
+    /**
+     * 标记本地存储的全部内置系统通知为已读
+     * @param params
+     */
+    public void markAllNotificationsAsRead(String params[]) {
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        try {
+            NIMClient.getService(SystemMessageService.class).resetSystemMessageUnreadCount();
+            result.put("result", true);
+            evaluateRootWindowScript(JsConst.CALLBACK_MARK_ALL_NOTIFICATIONS_AS_READ, getJSONFromMap(result));
+        } catch (Exception e) {
+            Log.i(TAG, e.getMessage());
+            result.put("result", false);
+            evaluateRootWindowScript(JsConst.CALLBACK_MARK_ALL_NOTIFICATIONS_AS_READ, getJSONFromMap(result));
+        }
+    }
+
+    /**
+     *  发送自定义通知(客户端)
+     * @param params
+     */
+    public void sendCustomNotification(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        String sessionId;
+        int sessionType;
+        boolean sendToOnlineUsersOnly;
+        String content;
+        String apnsContent;
+        boolean shouldBeCounted;
+        boolean apnsEnable;
+        boolean apnsWithPrefix;
+
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            sessionId = jsonObject.optString("sessionId");
+            sessionType = jsonObject.optInt("sessionType");
+            sendToOnlineUsersOnly = jsonObject.optBoolean("sendToOnlineUsersOnly", true);
+            content = jsonObject.optString("content");
+            apnsContent =  jsonObject.optString("apnsContent");
+            shouldBeCounted =  jsonObject.optBoolean("shouldBeCounted");
+            apnsEnable = jsonObject.optBoolean("apnsEnable");
+            apnsWithPrefix =  jsonObject.optBoolean("apnsWithPrefix");
+
+            CustomNotification command = new CustomNotification();
+            command.setSessionId(sessionId);
+            command.setSessionType(SessionTypeEnum.typeOfValue(sessionType));
+            CustomNotificationConfig config = new CustomNotificationConfig();
+            config.enablePush = apnsEnable;
+            config.enableUnreadCount = shouldBeCounted;
+            config.enablePushNick = apnsWithPrefix; //仅针对iOS
+            command.setConfig(config);
+            //定义通知内容
+            JSONObject jsonContent = new JSONObject();
+            jsonContent.put("id", "2");
+            JSONObject data = new JSONObject();
+            data.put("body", content);
+            command.setContent(jsonContent.toString());
+            command.setApnsText(apnsContent);
+            command.setSendToOnlineUserOnly(sendToOnlineUsersOnly);
+            //发送通知
+            NIMClient.getService(MsgService.class).sendCustomNotification(command);
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+        }
+    }
+
+    //----------------------------------用户资料托管----------------------------
+    //获取用户资料
+    public void userInfo(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            String userId = jsonObject.optString("userId");
+            if (TextUtils.isEmpty(userId)) {
+                result.put("error", "userId can not be null");
+                evaluateRootWindowScript(JsConst.CALLBACK_USER_INFO, getJSONFromMap(result));
+                return;
+            }
+            NimUserInfo user = NIMClient.getService(UserService.class).getUserInfo(userId);
+            //是否需要消息提醒
+            boolean notice = NIMClient.getService(FriendService.class).isNeedMessageNotify(userId);
+            //是否在黑名单中
+            boolean isInMyBlackList = NIMClient.getService(FriendService.class).isInBlackList(userId);
+            result.put("userId", userId);
+            result.put("alias", user.getName());
+            result.put("notifyForNewMsg", notice);
+            result.put("isInMyBlackList", isInMyBlackList);
+            UserInfoVo vo = DataUtil.trans2UserInfoVo(user);
+            result.put("userInfo",vo);
+            evaluateRootWindowScript(JsConst.CALLBACK_USER_INFO, new Gson().toJson(result));
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+        }
+    }
+
+    /**
+     * 获取服务器用户资料
+     * @param params
+     */
+    public void fetchUserInfos(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            String usersStr = jsonObject.optString("userIds");
+            JSONArray users = new JSONArray(usersStr);
+            if (users == null || users.length() < 1) {
+                result.put("error", "invalid params");
+                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_USER_INFOS, getJSONFromMap(result));
+                return;
+            }
+            List<String> userIds = new ArrayList<String>();
+            for (int i = 0; i < users.length(); i ++) {
+                userIds.add(users.getString(i));
+            }
+            NIMClient.getService(UserService.class).fetchUserInfo(userIds)
+                    .setCallback(new RequestCallbackTemplate<List<NimUserInfo>>("fetchUserInfos", JsConst.CALLBACK_FETCH_USER_INFOS, new CustomDataUtil<List<NimUserInfo>>() {
+                        @Override
+                        public String getDataStr(List<NimUserInfo> nimUserInfos) {
+                            List<UserInfoVo> userInfoVoList = DataUtil.trans2UserInfoVoList(nimUserInfos);
+                            result.put("users", userInfoVoList);
+                            return new Gson().toJson(result);
+                        }
+                    }));
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+        }
+    }
+
+    /**
+     * 更新当前用户信息
+     * @param params
+     */
+    public void updateMyUserInfo(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            String nickName = jsonObject.optString("nickname");
+            String avatar = jsonObject.optString("avatar");
+            String sign = jsonObject.optString("sign");
+            int gender = jsonObject.optInt("gender", 1);
+            String email = jsonObject.optString("email");
+            String birth = jsonObject.optString("birth");
+            String mobile = jsonObject.optString("mobile");
+            String ext = jsonObject.optString("ext");
+            Map<UserInfoFieldEnum, Object> fields = new HashMap<UserInfoFieldEnum, Object>();
+            if (!TextUtils.isEmpty(nickName)) {
+                fields.put(UserInfoFieldEnum.Name, nickName);
+            }
+            if (!TextUtils.isEmpty(avatar)) {
+                fields.put(UserInfoFieldEnum.AVATAR, avatar);
+            }
+            if (!TextUtils.isEmpty(sign)) {
+                fields.put(UserInfoFieldEnum.SIGNATURE, sign);
+            }
+            fields.put(UserInfoFieldEnum.GENDER, gender);
+            if (!TextUtils.isEmpty(email)) {
+                fields.put(UserInfoFieldEnum.EMAIL, email);
+            }
+            if (!TextUtils.isEmpty(birth)) {
+                fields.put(UserInfoFieldEnum.BIRTHDAY, birth);
+            }
+            if (!TextUtils.isEmpty(mobile)) {
+                fields.put(UserInfoFieldEnum.MOBILE, mobile);
+            }
+            if (!TextUtils.isEmpty(ext)) {
+                fields.put(UserInfoFieldEnum.EXTEND, ext);
+            }
+            NIMClient.getService(UserService.class).updateUserInfo(fields)
+                    .setCallback(new RequestCallbackTemplate<Void>("updateMyUserInfo", JsConst.CALLBACK_UPDATE_MY_USER_INFO));
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+        }
+    }
+
+    //--------------------------------用户关系托管-----------------------------------------
+
+    /**
+     * 获取好友列表
+     * @param params
+     */
+    public void myFriends(String params[]) {
+        HashMap<String, Object> result = new HashMap<String, Object>();
+        List<String> friendAccounts = NIMClient.getService(FriendService.class).getFriendAccounts();
+        if (friendAccounts == null || friendAccounts.size() == 0) {
+            result.put("users", new JSONObject());
+        } else {
+            List<NimUserInfo>  userInfos = NIMClient.getService(UserService.class).getUserInfoList(friendAccounts);
+            List<UserInfoVo> userInfoVoList = DataUtil.trans2UserInfoVoList(userInfos);
+            result.put("users", userInfoVoList);
+        }
+        evaluateRootWindowScript(JsConst.CALLBACK_MY_FRIENDS, new Gson().toJson(result));
+
+    }
+
+    /**
+     * 好友请求
+     * 好友请求包括请求添加好友以及同意/拒绝好友请求两种
+     * @param params
+     */
+    public void requestFriend(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            String userId = jsonObject.optString("userId");
+            int operation = jsonObject.optInt("operation", 1);
+            String message = jsonObject.optString("message");
+            //1:添加好友(直接添加为好友,无需验证) 2:请求添加好友 3:通过添加好友请求 4:拒绝添加好友请求
+            if (operation == 1 || operation == 2) {
+                VerifyType verifyType = operation == 1 ? VerifyType.DIRECT_ADD : VerifyType.VERIFY_REQUEST;
+                NIMClient.getService(FriendService.class).addFriend(new AddFriendData(userId, verifyType, message))
+                        .setCallback(new RequestCallbackTemplate<Void>("requestFriend", JsConst.CALLback_REQUEST_FRIEND));
+                return;
+            }
+            if (operation == 3 || operation == 4) {
+                boolean approve = operation == 3 ? true: false;
+                NIMClient.getService(FriendService.class).ackAddFriendRequest(userId, approve)
+                        .setCallback(new RequestCallbackTemplate<Void>("requestFriend", JsConst.CALLback_REQUEST_FRIEND));
+            }
+        } catch (JSONException e) {
+            Log.i(TAG, "[requestFriend]" + e.getMessage());
+        }
+    }
+
+    /**
+     * 删除好友
+     * @param params
+     */
+    public void deleteFriend(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            String account = jsonObject.optString("userId");
+            NIMClient.getService(FriendService.class).deleteFriend(account).setCallback(new RequestCallbackTemplate<Void>("deleteFriend", JsConst.CALLback_DELETE_FRIEND));
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+        }
+    }
+
+    /**
+     * 获取黑名单成员列表
+     * @param params
+     */
+    public void myBlackList(String params[]) {
+        List<String> accounts = NIMClient.getService(FriendService.class).getBlackList();
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        if (accounts != null && accounts.size() > 0) {
+            List<NimUserInfo> nimUserInfoList = NIMClient.getService(UserService.class).getUserInfoList(accounts);
+            List<UserInfoVo> list = DataUtil.trans2UserInfoVoList(nimUserInfoList);
+            result.put("users",list);
+        } else {
+            result.put("users", new Object[0]);
+        }
+        evaluateRootWindowScript(JsConst.CALLBACK_MY_BLACK_LIST, new Gson().toJson(result));
+    }
+
+    /**
+     * 添加用户到黑名单
+     * @param params
+     */
+    public void addToBlackList(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            String account = jsonObject.optString("userId");
+            if (TextUtils.isEmpty(account)) {
+                result.put("error", "invalid params");
+                evaluateRootWindowScript(JsConst.CALLback_ADD_TO_BLACK_LIST, getJSONFromMap(result));
+                return;
+            }
+            NIMClient.getService(FriendService.class).addToBlackList(account).setCallback(new RequestCallbackTemplate<Void>("addToBlackList", JsConst.CALLback_ADD_TO_BLACK_LIST));
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+        }
+    }
+
+    /**
+     * 将用户移除黑名单
+     * @param params
+     */
+    public void removeFromBlackBlackList(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            String account = jsonObject.optString("userId");
+            if (TextUtils.isEmpty(account)) {
+                result.put("error", "invalid params");
+                evaluateRootWindowScript(JsConst.CALLback_REMOVE_FROM_BLACK_LIST, getJSONFromMap(result));
+                return;
+            }
+            NIMClient.getService(FriendService.class).removeFromBlackList(account).setCallback(
+                    new RequestCallbackTemplate<Void>("removeFromBlackBlackList", JsConst.CALLback_REMOVE_FROM_BLACK_LIST));
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+        }
+    }
+
+    /**
+     * 判断某用户是否在自己的黑名单中
+     * @param params
+     */
+    public void isUserInBlackList(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            String account = jsonObject.optString("userId");
+            if (TextUtils.isEmpty(account)) {
+                result.put("error", "invalid params");
+                evaluateRootWindowScript(JsConst.CALLback_IS_USER_IN_BLACK_LIST, getJSONFromMap(result));
+                return;
+            }
+            boolean isInBlackList = NIMClient.getService(FriendService.class).isInBlackList(account);
+            result.put("result", isInBlackList);
+            evaluateRootWindowScript(JsConst.CALLback_IS_USER_IN_BLACK_LIST, getJSONFromMap(result));
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+        }
+    }
+
+    /**
+     * 获取静音成员列表
+     * @param params
+     */
+    public void myMuteUserList(String params[]) {
+        List<String> accountList = NIMClient.getService(FriendService.class).getMuteList();
+        HashMap<String, Object> result = new HashMap<String, Object>();
+        if (accountList != null && accountList.size() > 0) {
+            List<NimUserInfo> nimUserInfoList = NIMClient.getService(UserService.class).getUserInfoList(accountList);
+            List<UserInfoVo> userInfoVoList = DataUtil.trans2UserInfoVoList(nimUserInfoList);
+            result.put("users", userInfoVoList);
+        } else {
+            result.put("users", new Object[0]);
+        }
+        evaluateRootWindowScript(JsConst.CALLBACK_MY_MUTE_USER_LIST, new Gson().toJson(result));
+    }
+
+    /**
+     * 设置消息提醒
+     * @param params
+     */
+    public void updateNotifyStateForUser(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            String account = jsonObject.optString("userId");
+            boolean notify = jsonObject.optBoolean("notify", true);
+            if (TextUtils.isEmpty(account)) {
+                result.put("error", "invalid params");
+                evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_USER, getJSONFromMap(result));
+                return;
+            }
+            NIMClient.getService(FriendService.class).setMessageNotify(account, notify);
+            evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_USER, "{}");
+        } catch (Exception e) {
+            Log.i(TAG, e.getMessage());
+        }
+    }
+
+    /**
+     *  判断是否需要消息通知
+     * @param params
+     */
+    public void notifyForNewMsgForUser(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            String account = jsonObject.optString("userId");
+            if (TextUtils.isEmpty(account)) {
+                result.put("error", "invalid params");
+                evaluateRootWindowScript(JsConst.CALLBACK_NOTIFY_FOR_NEW_MSG_FOR_USER, getJSONFromMap(result));
+                return;
+            }
+            boolean notice = NIMClient.getService(FriendService.class).isNeedMessageNotify(account);
+            result.put("result", notice);
+            evaluateRootWindowScript(JsConst.CALLBACK_NOTIFY_FOR_NEW_MSG_FOR_USER, getJSONFromMap(result));
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+        }
+    }
+
+
+
+    interface CustomDataUtil<T> {
+        String getDataStr(T t);
+    }
+
+    class RequestCallbackTemplate <T> implements RequestCallback<T> {
+        private String callBackFun;
+        private String funName;
+        private CustomDataUtil util;
+
+        public RequestCallbackTemplate (String funName, String callBackFun, CustomDataUtil util) {
+            this.funName = funName;
+            this.callBackFun = callBackFun;
+            this.util = util;
+        }
+
+        public RequestCallbackTemplate (String funName, String callBackFun) {
+            this.funName = funName;
+            this.callBackFun = callBackFun;
+        }
+        @Override
+        public void onSuccess(T t) {
+            if (t instanceof  Void) {
+                evaluateRootWindowScript(callBackFun, "{}");
+            } else {
+                if (util == null) {
+                    evaluateRootWindowScript(callBackFun, "{}");
+                } else {
+                    evaluateRootWindowScript(callBackFun, util.getDataStr(t));
+                }
+            }
+        }
+
+        @Override
+        public void onFailed(int code ) {
+            Log.i(TAG, "[" + funName + "]fail code:" + code);
+            HashMap<String, Object> result = new HashMap<String, Object>();
+            result.put("error", code);
+            evaluateRootWindowScript(callBackFun, getJSONFromMap(result));
+        }
+
+        @Override
+        public void onException(Throwable throwable) {
+            Log.i(TAG, "[" + funName + "]" + throwable.getMessage());
+            HashMap<String, Object> result = new HashMap<String, Object>();
+            result.put("error", throwable.getMessage());
+            evaluateRootWindowScript(callBackFun, getJSONFromMap(result));
+        }
+    }
+
+    //－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－聊天室相关－－－－－－－－－－－－－－－－－－－－－－－－－－－－－
+    public void enterChatRoom(String [] params) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        JSONObject jsonObject;
+        try {
+            jsonObject = new JSONObject(json);
+            String roomId = jsonObject.optString("roomId");
+            String nickName = jsonObject.optString("nickName");
+            String avatar = jsonObject.optString("avatar");
+            JSONObject extension = jsonObject.optJSONObject("extension"); //用户扩展字段
+            JSONObject notifyExtension = jsonObject.optJSONObject("notifyExtension");//通知扩展字段
+            if (TextUtils.isEmpty(roomId)) {
+                result.put("error", "roomId can not be null");
+                evaluateRootWindowScript(JsConst.CALLBACK_ENTER_CHATROOM, getJSONFromMap(result));
+                return;
+            }
+            EnterChatRoomData data = new EnterChatRoomData(roomId);
+            data.setNick(nickName);
+            data.setAvatar(avatar);
+            if (extension != null) {
+                data.setExtension(getMapFromJSON(extension));
+            }
+            if (notifyExtension != null) {
+                data.setNotifyExtension(getMapFromJSON(notifyExtension));
+            }
+            NIMClient.getService(ChatRoomService.class).enterChatRoom(data).setCallback(new RequestCallbackTemplate<Void>("enterChatRoom", JsConst.CALLBACK_ENTER_CHATROOM));
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void exitChatRoom(String [] params) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+        String json = params[0];
+        JSONObject jsonObject;
+        try {
+            jsonObject = new JSONObject(json);
+            String roomId = jsonObject.optString("roomId");
+            if (TextUtils.isEmpty(roomId)) {
+                result.put("error", "roomId can not be null");
+                evaluateRootWindowScript(JsConst.CALLBACK_EXIT_CHATROOM, getJSONFromMap(result));
+                return;
+            }
+            NIMClient.getService(ChatRoomService.class).exitChatRoom(roomId);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void getChatRoomHistoryMsg(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        String json = params[0];
+        JSONObject jsonObject;
+        String roomId = null;
+        long startTime = 0;
+        int limit = 10;
+        try {
+            jsonObject = new JSONObject(json);
+            roomId = jsonObject.optString("roomId");
+            startTime = jsonObject.optLong("startTime", 0);
+            limit = jsonObject.optInt("limit", 10);
+            if (TextUtils.isEmpty(roomId)) {
+                Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+            Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        NIMClient.getService(ChatRoomService.class).pullMessageHistory(roomId, startTime, limit)
+                .setCallback(new RequestCallbackTemplate<List<ChatRoomMessage>>("getChatRoomHistoryMsg", JsConst.CALLBACK_GET_CHATROOM_HISTORY_MSG, new CustomDataUtil<List<ChatRoomMessage>>() {
+                    @Override
+                    public String getDataStr(List<ChatRoomMessage> messages) {
+                        Log.i(TAG, "message data:" + new Gson().toJson(messages));
+                        if (messages != null) {
+                            List<ChatRoomMessageVo> list = new ArrayList<ChatRoomMessageVo>();
+                            for (ChatRoomMessage msg : messages) {
+                                ChatRoomMessageVo vo = DataUtil.trans2ChatRoomMessageVo(msg);
+                                list.add(vo);
+                            }
+                            HashMap<String, Object> result = new HashMap<String, Object>();
+                            result.put("messages", list);
+                            return new Gson().toJson(result);
+                        } else {
+                            HashMap<String, Object> result = new HashMap<String, Object>();
+                            result.put("messages", new JSONObject());
+                            return new Gson().toJson(result);
+                        }
+                    }
+                }));
+    }
+
+    //获取聊天室基本信息
+    public void getChatRoomInfo(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        String json = params[0];
+        JSONObject jsonObject;
+        String roomId = null;
+
+        try {
+            jsonObject = new JSONObject(json);
+            roomId = jsonObject.optString("roomId");
+            if (TextUtils.isEmpty(roomId)) {
+                Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+            Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        NIMClient.getService(ChatRoomService.class)
+                .fetchRoomInfo(roomId).setCallback(new RequestCallbackTemplate<ChatRoomInfo>("getChatRoomInfo", JsConst.CALLBACK_GET_CHATROOM_INFO, new CustomDataUtil<ChatRoomInfo>() {
+            @Override
+            public String getDataStr(ChatRoomInfo chatRoomInfo) {
+                HashMap<String, Object> result = new HashMap<String, Object>();
+                ChatRoomInfoVo vo = DataUtil.trans2ChatRoomInfoVo(chatRoomInfo);
+                result.put("data", vo);
+                return new Gson().toJson(result);
+            }
+        }));
+    }
+
+    //获取聊天室成员
+    public void getChatRoomMembers(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        String json = params[0];
+        JSONObject jsonObject;
+        String roomId = null;
+        int type = 0; // 0 : Normal, 1: Guest, 2:Online normal
+        long time = 0;
+        int limit = 10;
+
+        try {
+            jsonObject = new JSONObject(json);
+            roomId = jsonObject.optString("roomId");
+            if (TextUtils.isEmpty(roomId)) {
+                Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            type = jsonObject.optInt("type", 0);
+            time = jsonObject.optLong("time", 0);
+            limit = jsonObject.optInt("limit", 10);
+
+
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+            Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        NIMClient.getService(ChatRoomService.class)
+                .fetchRoomMembers(roomId, MemberQueryType.typeOfValue(type), time, limit)
+                .setCallback(new RequestCallbackTemplate<List<ChatRoomMember>>("getChatRoomMembers", JsConst.CALLBACK_GET_CHATROOM_MEMBERS, new CustomDataUtil<List<ChatRoomMember>>() {
+                    @Override
+                    public String getDataStr(List<ChatRoomMember> chatRoomMembers) {
+                        List<ChatRoomMemberVo> list = DataUtil.trans2ChatRoomMembers(chatRoomMembers);
+                        HashMap<String, Object> result = new HashMap<String, Object>();
+                        result.put("data", list);
+                        return new Gson().toJson(result);
+                    }
+                }));
+    }
+
+    //通过用户 id 批量获取指定成员在聊天室中的信息
+    public void getChatRoomMembersByIds(String params[]) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        String json = params[0];
+        JSONObject jsonObject;
+        String roomId = null;
+        JSONArray ids = null;
+        List<String> accountList = new ArrayList<String>();
+        try {
+            jsonObject = new JSONObject(json);
+            roomId = jsonObject.optString("roomId");
+
+            String usersStr = jsonObject.optString("userIds");
+            ids = new JSONArray(usersStr);
+
+            if (TextUtils.isEmpty(roomId)) {
+                Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (ids == null) {
+                Toast.makeText(mContext, "user id list is empty !", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            for (int i = 0; i < ids.length(); i++) {
+                accountList.add(ids.getString(i));
+            }
+        } catch (JSONException e) {
+            Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+         NIMClient.getService(ChatRoomService.class)
+                .fetchRoomMembersByIds(roomId, accountList).setCallback(new RequestCallbackTemplate<List<ChatRoomMember>>("getChatRoomMembersByIds",
+                 JsConst.CALLBACK_GET_CHATROOM_MEMBERS_BY_IDS, new CustomDataUtil<List<ChatRoomMember>>() {
+             @Override
+             public String getDataStr(List<ChatRoomMember> chatRoomMembers) {
+                 List<ChatRoomMemberVo> list = DataUtil.trans2ChatRoomMembers(chatRoomMembers);
+                 HashMap<String, Object> result = new HashMap<String, Object>();
+                 result.put("data", list);
+                 return new Gson().toJson(result);
+             }
+         }));
+    }
+
+    @Override
+    public void onChatRoomStatusChanged(ChatRoomStatusChangeData data) {
+        Log.i(TAG, "chat room online status changed to " + data.status.name());
+        HashMap<String, Object> result = new HashMap<String, Object>();
+        result.put("roomId", data.roomId);
+        int status = 0;
+        if (data.status == StatusCode.CONNECTING) {
+            Log.i(TAG, "ChatRoom:" + "连接中...");
+        } else if (data.status == StatusCode.LOGINING) {
+            Log.i(TAG, "ChatRoom:" + "连接中...");
+            status = 0;
+        } else if (data.status == StatusCode.LOGINED) {
+            Log.i(TAG, "ChatRoom:" + "登录成功...");
+            status = 1;
+        } else if (data.status == StatusCode.UNLOGIN) {
+            Log.i(TAG, "ChatRoom:" + "UNLOGIN...");
+            status = 2;
+        } else if (data.status == StatusCode.NET_BROKEN) {
+            status = 3;
+        }
+        result.put("status", status);
+        evaluateRootWindowScript(JsConst.ON_CHATROOM_STATUS_CHANGE, getJSONFromMap(result));
+    }
+
+    public void addUserToBlackList(String [] params) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        String json = params[0];
+        JSONObject jsonObject;
+        String roomId;
+        String account;
+        boolean isAdd;
+        try {
+            jsonObject = new JSONObject(json);
+            roomId = jsonObject.optString("roomId");
+            account = jsonObject.optString("userId");
+            isAdd = jsonObject.optBoolean("isAdd", true);
+
+            if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
+                Toast.makeText(mContext, "roomId or account is empty !", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+            Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        MemberOption option = new MemberOption(roomId, account);
+        NIMClient.getService(ChatRoomService.class)
+                .markChatRoomBlackList(isAdd, option)
+                .setCallback(new RequestCallbackTemplate<ChatRoomMember>("addUserToBlackList", JsConst.CALLBACK_ADD_USER_TO_BLACK_LIST));
+    }
+
+    public void muteUser(String [] params) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        String json = params[0];
+        JSONObject jsonObject;
+        String roomId;
+        String account;
+        boolean isMute;
+        try {
+            jsonObject = new JSONObject(json);
+            roomId = jsonObject.optString("roomId");
+            account = jsonObject.optString("userId");
+            isMute = jsonObject.optBoolean("isMute", true);
+
+            if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
+                Toast.makeText(mContext, "roomId or account is empty !", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+            Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        MemberOption option = new MemberOption(roomId, account);
+        NIMClient.getService(ChatRoomService.class)
+                .markChatRoomMutedList(isMute, option)
+                .setCallback(new RequestCallbackTemplate<ChatRoomMember>("muteUser", JsConst.CALLBACK_MUTE_USER));
+    }
+
+    public void setAdmin(String [] params) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        String json = params[0];
+        JSONObject jsonObject;
+        String roomId;
+        String account;
+        boolean isAdmin;
+        try {
+            jsonObject = new JSONObject(json);
+            roomId = jsonObject.optString("roomId");
+            account = jsonObject.optString("userId");
+            isAdmin = jsonObject.optBoolean("isAdmin", true);
+
+            if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
+                Toast.makeText(mContext, "roomId or account is empty !", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+            Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        MemberOption option = new MemberOption(roomId, account);
+        NIMClient.getService(ChatRoomService.class)
+                .markChatRoomManager(isAdmin, option)
+                .setCallback(new RequestCallbackTemplate<ChatRoomMember>("setAdmin", JsConst.CALLBACK_SET_ADMIN));
+    }
+
+    public void setNormal(String [] params) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        String json = params[0];
+        JSONObject jsonObject;
+        String roomId;
+        String account;
+        boolean isNormal;
+        try {
+            jsonObject = new JSONObject(json);
+            roomId = jsonObject.optString("roomId");
+            account = jsonObject.optString("userId");
+            isNormal = jsonObject.optBoolean("isNormal", true);
+
+            if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
+                Toast.makeText(mContext, "roomId or account is empty !", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+            Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        MemberOption option = new MemberOption(roomId, account);
+        NIMClient.getService(ChatRoomService.class)
+                .markNormalMember(isNormal, option)
+                .setCallback(new RequestCallbackTemplate<ChatRoomMember>("setNormal", JsConst.CALLBACK_SET_NORMAL));
+    }
+    //踢出聊天室
+    public void kickMemberFromChatRoom(String [] params) {
+        if (params == null || params.length < 1) {
+            errorCallback(0, 0, "error params!");
+            return;
+        }
+        String json = params[0];
+        JSONObject jsonObject;
+        String roomId;
+        String account;
+        String reason;
+        try {
+            jsonObject = new JSONObject(json);
+            roomId = jsonObject.optString("roomId");
+            account = jsonObject.optString("userId");
+            reason = jsonObject.optString("reason");
+
+            if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
+                Toast.makeText(mContext, "roomId or account is empty !", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        } catch (JSONException e) {
+            Log.i(TAG, e.getMessage());
+            Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Map<String, Object> reasonMap = new HashMap<>();
+        reasonMap.put("reason", reason);
+        NIMClient.getService(ChatRoomService.class)
+                .kickMember(roomId, account, reasonMap)
+                .setCallback(new RequestCallbackTemplate<Void>("kickMemberFromChatRoom", JsConst.CALLBACK_KICK_MEMBER_FROM_CHAT_ROOM));
+    }
+
+    @Override
+    public void onChatRoomKickOutEvent(ChatRoomKickOutEvent chatRoomKickOutEvent) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("roomId", chatRoomKickOutEvent.getRoomId());
+        result.put("code", chatRoomKickOutEvent.getReason().getValue());
+        evaluateRootWindowScript(JsConst.ON_CHAT_ROOM_KICK_OUT_EVENT, getJSONFromMap(result));
+    }
 
     public String getRealPath(String path){
         String realPath = BUtility.makeRealPath(
@@ -2078,6 +3146,9 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
 
     private String getJSONFromMap(Map<String, Object> result) {
+        if (result == null) {
+            return null;
+        }
         JSONObject jsonObject = new JSONObject();
         try {
             for (Map.Entry entry : result.entrySet()) {
@@ -2089,6 +3160,19 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             e.printStackTrace();
         }
         return jsonObject.toString();
+    }
+
+    private Map<String, Object> getMapFromJSON(JSONObject jsonObject) throws JSONException{
+        if (jsonObject == null) {
+            return null;
+        }
+        Iterator<String> keys = jsonObject.keys();
+        HashMap<String, Object> map = new HashMap<String, Object>();
+        while(keys.hasNext()) {
+            String key = keys.next();
+            map.put(key, jsonObject.get(key));
+        }
+        return map;
     }
 
     private static SDKOptions getOptions(Context context) {
@@ -2154,7 +3238,6 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         onCallback(js);
 
     }
-
     private void evaluateRootWindowScript(String methodName, String jsonData) {
         String js = SCRIPT_HEADER + "if(" + methodName + "){"
                 + methodName + "('" + jsonData + "');}";
@@ -2182,18 +3265,12 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         for (IMMessage message : messages) {
             list.add(DataUtil.trans2MessageVo(message));
         }
-        HashMap<String, Object> result = new HashMap<String, Object>();
-        result.put("data", new Gson().toJson(list));
-        evaluateRootWindowScript(JsConst.ON_RECIEVED_MESSAGE, getJSONFromMap(result));
+
+        evaluateRootWindowScript(JsConst.ON_RECIEVED_MESSAGE, new Gson().toJson(list));
     }
 
     @Override
     public void onMessageStatusChange(IMMessage msg) {
-//        String json = "";
-//        if (msg.getAttachment() != null) {
-//            json = msg.getAttachment().toJson(true);
-//        }
-//        Log.i(TAG, "[onMessageStatusChange]" + msg.getAttachStatus() + "  JSON:  " + json);
 
     }
 
@@ -2206,8 +3283,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
     public void onTeamRemoved(Team team) {
         HashMap<String, Object> result = new HashMap<String, Object>();
         TeamVo vo = DataUtil.trans2TeamVo(team);
-        result.put("team", new Gson().toJson(vo));
-        evaluateRootWindowScript(JsConst.ON_TEAM_REMOVED, getJSONFromMap(result));
+        result.put("team", vo);
+        evaluateRootWindowScript(JsConst.ON_TEAM_REMOVED, new Gson().toJson(result));
     }
 
     @Override
@@ -2216,8 +3293,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         List<TeamVo> list = new ArrayList<TeamVo>();
         for (Team team : teams) {
             HashMap<String, Object> result = new HashMap<String, Object>();
-            result.put("team", new Gson().toJson(DataUtil.trans2TeamVo(team)));
-            evaluateRootWindowScript(JsConst.ON_TEAM_UPDATED, getJSONFromMap(result));
+            result.put("team", DataUtil.trans2TeamVo(team));
+            evaluateRootWindowScript(JsConst.ON_TEAM_UPDATED, new Gson().toJson(result));
         }
 
      }
@@ -2229,15 +3306,45 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         for (TeamMember member : members) {
             list.add(DataUtil.trans2TeamMemberVo(member));
         }
-        result.put("data", new Gson().toJson(list));
-        evaluateRootWindowScript(JsConst.ON_TEAM_MEMBER_CHANGED, getJSONFromMap(result));
+        result.put("data", list);
+        evaluateRootWindowScript(JsConst.ON_TEAM_MEMBER_CHANGED, new Gson().toJson(result));
     }
 
     @Override
     public void onSystemMessageRecieved(SystemMessage message) {
         SystemMessageVo vo = DataUtil.trans2SystemMsgVo(message);
         HashMap<String, Object> result = new HashMap<String, Object>();
-        result.put("notification", new Gson().toJson(vo));
-        evaluateRootWindowScript(JsConst.ON_RECIEVED_SYSTEM_NOTIFICATION, getJSONFromMap(result));
+        result.put("notification", vo);
+        evaluateRootWindowScript(JsConst.ON_RECIEVED_SYSTEM_NOTIFICATION, new Gson().toJson(result));
+    }
+
+    @Override
+    public void onReceivedCustomNotification(CustomNotification customNotification) {
+        HashMap<String, Object> result = new HashMap<String, Object>();
+        CustomNotificationVo vo = DataUtil.trans2CustomNotificationVo(customNotification);
+        result.put("notification", vo);
+        evaluateRootWindowScript(JsConst.ON_RECIEVED_CUSTOM_SYSTEM_NOTIFICATION, new Gson().toJson(result));
+    }
+
+    @Override
+    public void onUserInfoUpdate(List<NimUserInfo> users) {
+        for(NimUserInfo user: users) {
+            UserInfoVo vo = DataUtil.trans2UserInfoVo(user);
+            HashMap<String, Object> map = new HashMap<String, Object>();
+            map.put("user", vo);
+            evaluateRootWindowScript(JsConst.ON_USER_INFO_UPDATE, new Gson().toJson(map));
+        }
+    }
+
+    @Override
+    public void onReceivedChatRoomMessage(List<ChatRoomMessage> messages) {
+        List<ChatRoomMessageVo> list = new ArrayList<ChatRoomMessageVo>();
+        for (ChatRoomMessage msg : messages) {
+            ChatRoomMessageVo vo = DataUtil.trans2ChatRoomMessageVo(msg);
+            list.add(vo);
+        }
+        HashMap<String, Object> result = new HashMap<String, Object>();
+        Log.i(TAG, "[Receive Msg]" + new Gson().toJson(list));
+        evaluateRootWindowScript(JsConst.ON_RECIEVED_MESSAGE, new Gson().toJson(list));
     }
 }

@@ -8,15 +8,22 @@ import com.netease.nimlib.sdk.Observer;
 import com.netease.nimlib.sdk.StatusCode;
 import com.netease.nimlib.sdk.auth.AuthServiceObserver;
 import com.netease.nimlib.sdk.auth.OnlineClient;
+import com.netease.nimlib.sdk.chatroom.ChatRoomServiceObserver;
+import com.netease.nimlib.sdk.chatroom.model.ChatRoomKickOutEvent;
+import com.netease.nimlib.sdk.chatroom.model.ChatRoomMessage;
+import com.netease.nimlib.sdk.chatroom.model.ChatRoomStatusChangeData;
 import com.netease.nimlib.sdk.msg.MsgServiceObserve;
 import com.netease.nimlib.sdk.msg.SystemMessageObserver;
 import com.netease.nimlib.sdk.msg.model.AttachmentProgress;
+import com.netease.nimlib.sdk.msg.model.CustomNotification;
 import com.netease.nimlib.sdk.msg.model.IMMessage;
 import com.netease.nimlib.sdk.msg.model.RecentContact;
 import com.netease.nimlib.sdk.msg.model.SystemMessage;
 import com.netease.nimlib.sdk.team.TeamServiceObserver;
 import com.netease.nimlib.sdk.team.model.Team;
 import com.netease.nimlib.sdk.team.model.TeamMember;
+import com.netease.nimlib.sdk.uinfo.UserServiceObserve;
+import com.netease.nimlib.sdk.uinfo.model.NimUserInfo;
 
 import org.zywx.wbpalmstar.plugin.uexnim.util.NIMConstant;
 
@@ -33,13 +40,19 @@ public class ListenerRegister {
         registerMsgObserver(register);
         registerTeamObservers(register);
         registerRecentContactListener(register); //注册最近联系人相关的监听
-        registerSystemMesgListener(register);
+        registerSystemMsgListener(register);
+        registerCustomNotification(register);
+        //监听用户资料变更
+        registerUserServiceListener(register);
+        //聊天室消息的监听
+        registerChatRoomListener(register);
     }
 
+
     private void registerMsgObserver(boolean register) {
-        NIMClient.getService(MsgServiceObserve.class).observeAttachmentProgress(attachmentProgressObserver, true);
-        NIMClient.getService(MsgServiceObserve.class).observeReceiveMessage(incomingMessageObserver, true);
-        NIMClient.getService(MsgServiceObserve.class).observeMsgStatus(messageStatusObserver, true);
+        NIMClient.getService(MsgServiceObserve.class).observeAttachmentProgress(attachmentProgressObserver, register);
+        NIMClient.getService(MsgServiceObserve.class).observeReceiveMessage(incomingMessageObserver, register);
+        NIMClient.getService(MsgServiceObserve.class).observeMsgStatus(messageStatusObserver, register);
     }
 
     //监听接收的消息
@@ -112,7 +125,6 @@ public class ListenerRegister {
         //返回的是有更新的群资料
         @Override
         public void onEvent(List<Team> teams) {
-            Log.i("onEvent", "--teamUpdateObserver:" + new Gson().toJson(teams));
             callback.onTeamUpdated(teams);
         }
     };
@@ -153,7 +165,7 @@ public class ListenerRegister {
             // 3、刷新界面
         }
     };
-    private void registerSystemMesgListener(boolean register) {
+    private void registerSystemMsgListener(boolean register) {
         NIMClient.getService(SystemMessageObserver.class)
                 .observeReceiveSystemMsg(systemMessageObserver, true);
     }
@@ -163,6 +175,7 @@ public class ListenerRegister {
             callback.onSystemMessageRecieved(message);
         }
     };
+
 
     private void registerRecentContactListener(boolean register) {
         NIMClient.getService(MsgServiceObserve.class).observeRecentContact(recentContactObserver, true);
@@ -174,6 +187,60 @@ public class ListenerRegister {
             callback.onUpdateRecentSession(messages);
         }
     };
+
+    private void registerCustomNotification(boolean register) {
+        NIMClient.getService(MsgServiceObserve.class).observeCustomNotification(customNotificationObserver, register);
+    }
+
+    //自定义通知的接收观察者
+    private Observer<CustomNotification> customNotificationObserver = new Observer<CustomNotification>() {
+        @Override
+        public void onEvent(CustomNotification customNotification) {
+            callback.onReceivedCustomNotification(customNotification);
+        }
+    };
+
+
+
+    private void registerUserServiceListener(boolean register) {
+        NIMClient.getService(UserServiceObserve.class).observeUserInfoUpdate(userInfoUpdateObserver, register);
+    }
+    // 用户资料变更观察者
+    private Observer<List<NimUserInfo>> userInfoUpdateObserver = new Observer<List<NimUserInfo>>() {
+        @Override
+        public void onEvent(List<NimUserInfo> users) {
+            callback.onUserInfoUpdate(users);
+        }
+    };
+
+    //聊天室消息的监听
+    private void registerChatRoomListener(boolean register) {
+        NIMClient.getService(ChatRoomServiceObserver.class).observeReceiveMessage(incomingChatRoomMsg, register);
+        //聊天室状态的监听
+        NIMClient.getService(ChatRoomServiceObserver.class).observeOnlineStatus(chatRoomOnlineStatus, register);
+        NIMClient.getService(ChatRoomServiceObserver.class)
+                .observeKickOutEvent(kickOutObserver, register);
+    }
+    private Observer<List<ChatRoomMessage>> incomingChatRoomMsg = new Observer<List<ChatRoomMessage>>() {
+        @Override
+        public void onEvent(List<ChatRoomMessage> messages) {
+            callback.onReceivedChatRoomMessage(messages);
+        }
+    };
+    private Observer<ChatRoomStatusChangeData> chatRoomOnlineStatus = new Observer<ChatRoomStatusChangeData>() {
+        @Override
+        public void onEvent(ChatRoomStatusChangeData data) {
+            // 如果遇到错误码13001，13002，13003，403，404，414，表示无法进入聊天室，此时应该调用离开聊天室接口。
+            callback.onChatRoomStatusChanged(data);
+        }
+    };
+    private Observer<ChatRoomKickOutEvent> kickOutObserver = new Observer<ChatRoomKickOutEvent>() {
+        @Override
+        public void onEvent(ChatRoomKickOutEvent chatRoomKickOutEvent) {
+            callback.onChatRoomKickOutEvent(chatRoomKickOutEvent);
+        }
+    };
+
 
     public void setCallback(ListenersCallback callback) {
         this.callback = callback;
@@ -187,11 +254,20 @@ public class ListenerRegister {
 
         void onKick(int code);
         void onMultiLoginClientsChanged(List<OnlineClient> onlineClients);
+
         void onTeamRemoved(Team team);
         void onTeamUpdated(List<Team> teams);
-
         void onTeamMemberChanged(List<TeamMember> members);
 
         void onSystemMessageRecieved(SystemMessage message);
+
+        void onReceivedCustomNotification(CustomNotification customNotification);
+
+        void onUserInfoUpdate(List<NimUserInfo> users);
+        void onReceivedChatRoomMessage(List<ChatRoomMessage> messages);
+
+        void onChatRoomStatusChanged(ChatRoomStatusChangeData data);
+
+        void onChatRoomKickOutEvent(ChatRoomKickOutEvent chatRoomKickOutEvent);
     }
 }
