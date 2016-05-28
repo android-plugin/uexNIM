@@ -3086,7 +3086,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
             return;
         }
-        Map<String, Object> reasonMap = new HashMap<>();
+        Map<String, Object> reasonMap = new HashMap<String, Object>();
         reasonMap.put("reason", reason);
         NIMClient.getService(ChatRoomService.class)
                 .kickMember(roomId, account, reasonMap)
