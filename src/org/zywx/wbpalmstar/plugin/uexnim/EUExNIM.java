@@ -3095,7 +3095,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
     @Override
     public void onChatRoomKickOutEvent(ChatRoomKickOutEvent chatRoomKickOutEvent) {
-        Map<String, Object> result = new HashMap<>();
+        Map<String, Object> result = new HashMap<String, Object>();
         result.put("roomId", chatRoomKickOutEvent.getRoomId());
         result.put("code", chatRoomKickOutEvent.getReason().getValue());
         evaluateRootWindowScript(JsConst.ON_CHAT_ROOM_KICK_OUT_EVENT, getJSONFromMap(result));
