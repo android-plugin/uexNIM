@@ -215,6 +215,7 @@ public class ListenerRegister {
 
     //聊天室消息的监听
     private void registerChatRoomListener(boolean register) {
+        NIMClient.getService(ChatRoomServiceObserver.class).observeAttachmentProgress(attachmentProgressObserver, register);
         NIMClient.getService(ChatRoomServiceObserver.class).observeReceiveMessage(incomingChatRoomMsg, register);
         //聊天室状态的监听
         NIMClient.getService(ChatRoomServiceObserver.class).observeOnlineStatus(chatRoomOnlineStatus, register);

@@ -78,9 +78,7 @@ import org.zywx.wbpalmstar.base.ResoureFinder;
 import org.zywx.wbpalmstar.engine.EBrowserView;
 import org.zywx.wbpalmstar.engine.universalex.EUExBase;
 import org.zywx.wbpalmstar.plugin.uexnim.util.CommonUtil;
-import org.zywx.wbpalmstar.plugin.uexnim.util.ContactHttpClient;
 import org.zywx.wbpalmstar.plugin.uexnim.util.DataUtil;
-import org.zywx.wbpalmstar.plugin.uexnim.util.MD5;
 import org.zywx.wbpalmstar.plugin.uexnim.util.NIMConstant;
 import org.zywx.wbpalmstar.plugin.uexnim.util.SharedPreferencesHelper;
 import org.zywx.wbpalmstar.plugin.uexnim.vo.ChatRoomInfoVo;
@@ -314,53 +312,6 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             evaluateRootWindowScript(JsConst.CALLBACK_LOGOUT, getJSONFromMap(result));
         }
     }
-    //注册用户，仅供测试时使用
-    public void registerUser(String params[]) {
-        if (params == null || params.length < 1) {
-            errorCallback(0, 0, "error params!");
-            return;
-        }
-        String json = params[0];
-        JSONObject jsonObject;
-        String account = null;
-        String nickName = null;
-        String password = null;
-        final HashMap<String, Object> result = new HashMap<String, Object>();
-        try {
-            jsonObject = new JSONObject(json);
-            account = jsonObject.optString("userId");
-            nickName = jsonObject.optString("nickname");
-            password = jsonObject.optString("password");
-            password = MD5.getStringMD5(password);
-
-            if (TextUtils.isEmpty(account)
-                    || TextUtils.isEmpty(password)) {
-                result.put("result", false);
-                result.put("error", "userId or password is empty !");
-                evaluateRootWindowScript(JsConst.CALLBACK_REGISTER_USER, getJSONFromMap(result));
-                return;
-            }
-        } catch (JSONException e) {
-            Log.i(TAG, e.getMessage());
-            return;
-        }
-
-        ContactHttpClient.getInstance().register(mContext, account, nickName, password, new ContactHttpClient.ContactHttpCallback<Void>() {
-            @Override
-            public void onSuccess(Void aVoid) {
-                result.put("result", true);
-                evaluateRootWindowScript(JsConst.CALLBACK_REGISTER_USER, getJSONFromMap(result));
-            }
-
-            @Override
-            public void onFailed(int code, String errorMsg) {
-                result.put("result", false);
-                result.put("error", "code:" + code + "   msg:" + errorMsg);
-                evaluateRootWindowScript(JsConst.CALLBACK_REGISTER_USER, getJSONFromMap(result));
-            }
-        });
-    }
-
 
     //-----------------------------------基础消息功能--------------------------------------
 
@@ -631,7 +582,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_AUDIO, sessionType, message);
-            NIMClient.getService(MsgService.class).sendMessage(message, true);
+            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(sendMsgCallback);
         }
     }
 
@@ -680,6 +631,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (ext != null) {
                 message.setRemoteExtension(ext);
             }
+            willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_VIDEO, sessionType, message);
             NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
         } else {
             // 创建视频消息
@@ -695,7 +647,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (ext != null) {
                 message.setRemoteExtension(ext);
             }
-            NIMClient.getService(MsgService.class).sendMessage(message, true);
+            willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_VIDEO, sessionType, message);
+            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(sendMsgCallback);
         }
     }
 
@@ -739,6 +692,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (ext != null) {
                 message.setRemoteExtension(ext);
             }
+            willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_FILE, sessionType, message);
             NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
         } else {
             IMMessage message = MessageBuilder.createFileMessage(
@@ -749,7 +703,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (ext != null) {
                 message.setRemoteExtension(ext);
             }
-            NIMClient.getService(MsgService.class).sendMessage(message, true);
+            willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_FILE, sessionType, message);
+            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(sendMsgCallback);
         }
     }
 

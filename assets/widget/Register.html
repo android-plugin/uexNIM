@@ -34,12 +34,12 @@
     </script>
     <script type="text/javascript">
         window.uexOnload = function(type){
-            
-        }
-    
-    
 
-    
+        }
+
+
+
+
     function registerApp(){
         var appKey = document.getElementById("initEasemobappKey").value;
         var apnsCertName = document.getElementById("initEasemobapnsCertName").value;
@@ -90,40 +90,30 @@
      </div>
      <!--header结束--><!--content开始-->
      <div id="content" class="ub-f1 tx-l t-bla" style="">
-            
+
      <div class="conbor">
         <div class="consj" id="topDiv">
             <div id='globalPostArea'>全局广播显示区域</div><br><br>
             <div> </div><div>======Initialization==========</div>
-            
-            
+
+
             <div> </div><span>registerApp</span>
             <div>appKey:</div><input class="textbox" type="text" id="initEasemobappKey" value="8ce4f10b741de88e2b6bd86fb9c27cc3">
                 <div>apnsCertName:</div><input class="textbox" type="text" id="initEasemobapnsCertName" value="ENTERPRISE">
                         <input class='btn' type='button' value='调用接口' onclick='registerApp()'>
-                                            
+
                             <div> </div><span>login</span>
                             <div>username:</div><input class="textbox" type="text" id="loginusername" value="user2">
                                 <div>password:</div><input class="textbox" type="text" id="loginpassword" value="123456">
                                     <input class='btn' type='button' value='Login调用接口' onclick='login()'>
                                     <input class='btn' type='button' value='autoLogin调用接口' onclick='autoLogin()'>
-                                        
+
                                         <div> </div><span>logout</span>
                                         <input class='btn' type='button' value='调用接口' onclick='logout()'>
-                                            
-                                            <div> </div><span>registerUser</span>
-                                            <div>username:</div><input class="textbox" type="text" id="registerUserusername" value="appcanuser1">
-                                                <div>nickname:</div><input class="textbox" type="text" id="registerUsernickname" value="appcan">
-                                                <div>password:</div><input class="textbox" type="text" id="registerUserpassword" value="appcanuser1">
-                                                    <input class='btn' type='button' value='调用接口' onclick='registerUser()'>
-                                                     
-                                                                    <div>======回调记录==========</div>
-                                                                    <div id='TestCallBack'>原本内容</div>
-                                                                    <div id='TestData'>原本内容</div>
-                                                                    <div>======回调记录==========</div>
+
       </div>
-        
-         
+
+
     </div>
     </div>
 </body>
