@@ -293,8 +293,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 list.add(vo);
             }
             HashMap<String, Object> result = new HashMap<String, Object>();
-            result.put("clients", result);
-            evaluateRootWindowScript(JsConst.ON_MULTI_LOGIN_CLIENTS_CHANGED, getJSONFromMap(result));
+            result.put("clients", list);
+            evaluateRootWindowScript(JsConst.ON_MULTI_LOGIN_CLIENTS_CHANGED, new Gson().toJson(result));
         }
     }
 
@@ -762,8 +762,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     recentVo.setLastMessage(vo);
                     list.add(recentVo);
                 }
-                map.put("sessions", new Gson().toJson(list));
-                evaluateRootWindowScript(JsConst.CALLBACK_ALL_RECENT_SESSION, getJSONFromMap(map));
+                map.put("sessions", list);
+                evaluateRootWindowScript(JsConst.CALLBACK_ALL_RECENT_SESSION, new Gson().toJson(map));
             }
         });
     }
@@ -811,8 +811,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 for (IMMessage msg : imMessages) {
                     list.add(DataUtil.trans2MessageVo(msg));
                 }
-                result.put("messages", new Gson().toJson(list));
-                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_MESSAGE_HISTORY, getJSONFromMap(result));
+                result.put("messages", list);
+                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_MESSAGE_HISTORY, new Gson().toJson(list));
             }
 
             @Override
@@ -2725,7 +2725,6 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 .setCallback(new RequestCallbackTemplate<List<ChatRoomMessage>>("getChatRoomHistoryMsg", JsConst.CALLBACK_GET_CHATROOM_HISTORY_MSG, new CustomDataUtil<List<ChatRoomMessage>>() {
                     @Override
                     public String getDataStr(List<ChatRoomMessage> messages) {
-                        Log.i(TAG, "message data:" + new Gson().toJson(messages));
                         if (messages != null) {
                             List<ChatRoomMessageVo> list = new ArrayList<ChatRoomMessageVo>();
                             for (ChatRoomMessage msg : messages) {
