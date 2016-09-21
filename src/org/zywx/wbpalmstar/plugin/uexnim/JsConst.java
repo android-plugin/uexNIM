@@ -12,7 +12,7 @@ public class JsConst {
     public static final String CALLBACK_REGISTER_USER = "uexNIM.cbRegisterUser";
 
 
-    public static final String CALLBACK_DID_SEND_MESSAGE = "uexNIM.cbDidSendMessage";
+    public static final String CALLBACK_DID_SEND_MESSAGE = "uexNIM.onMessageSend";
     public static final String ON_SEND_MESSAGE_WITH_PROGRESS = "uexNIM.onSendMessageWithProgress";
     public static final String WILL_SEND_MESSAGE = "uexNIM.willSendMessage";
     public static final String ON_RECIEVED_MESSAGE = "uexNIM.onRecvMessages"; //接收到消息时的监听
@@ -92,4 +92,5 @@ public class JsConst {
     public static final String CALLBACK_SET_NORMAL = "uexNIM.cbSetNormal";
     public static final String CALLBACK_KICK_MEMBER_FROM_CHAT_ROOM = "uexNIM.cbkKickMemberFromChatRoom";
     public static final String ON_CHAT_ROOM_KICK_OUT_EVENT = "uexNIM.onChatRoomKickOutEvent";
+    public static final String ON_BLACK_LIST_CHANGED = "uexNIM.onBlackListChanged";
 }

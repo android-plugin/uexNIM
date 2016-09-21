@@ -12,6 +12,8 @@ import com.netease.nimlib.sdk.chatroom.ChatRoomServiceObserver;
 import com.netease.nimlib.sdk.chatroom.model.ChatRoomKickOutEvent;
 import com.netease.nimlib.sdk.chatroom.model.ChatRoomMessage;
 import com.netease.nimlib.sdk.chatroom.model.ChatRoomStatusChangeData;
+import com.netease.nimlib.sdk.friend.FriendServiceObserve;
+import com.netease.nimlib.sdk.friend.model.BlackListChangedNotify;
 import com.netease.nimlib.sdk.msg.MsgServiceObserve;
 import com.netease.nimlib.sdk.msg.SystemMessageObserver;
 import com.netease.nimlib.sdk.msg.model.AttachmentProgress;
@@ -46,6 +48,8 @@ public class ListenerRegister {
         registerUserServiceListener(register);
         //聊天室消息的监听
         registerChatRoomListener(register);
+        //好友
+        registerFriendServiceObserver(register);
     }
 
 
@@ -83,7 +87,7 @@ public class ListenerRegister {
                 Log.i("Listener", "upload progress:" + attachmentProgress.getTransferred() + " /" + attachmentProgress.getTotal());
                 HashMap<String, Object> result = new HashMap<String, Object>();
                 result.put("result", true);
-                result.put(NIMConstant.TEXT_PROGRESS, attachmentProgress.getTransferred() / attachmentProgress.getTotal());
+                result.put(NIMConstant.TEXT_PROGRESS, attachmentProgress.getTransferred() / attachmentProgress.getTotal() * 1.0f);
                 result.put(NIMConstant.TEXT_MESSAGE_ID, attachmentProgress.getUuid());
                 callback.onSendMessageWithProgress(result);
             }
@@ -199,6 +203,15 @@ public class ListenerRegister {
             callback.onReceivedCustomNotification(customNotification);
         }
     };
+    private void registerFriendServiceObserver(boolean register){
+        NIMClient.getService(FriendServiceObserve.class).observeBlackListChangedNotify(blackListChangedNotifyObserver, register);
+    };
+    private Observer<BlackListChangedNotify> blackListChangedNotifyObserver = new Observer<BlackListChangedNotify>() {
+        @Override
+        public void onEvent(BlackListChangedNotify blackListChangedNotify) {
+            callback.onBlackListChanged(blackListChangedNotify);
+        }
+    };
 
 
 
@@ -270,5 +283,7 @@ public class ListenerRegister {
         void onChatRoomStatusChanged(ChatRoomStatusChangeData data);
 
         void onChatRoomKickOutEvent(ChatRoomKickOutEvent chatRoomKickOutEvent);
+
+        void onBlackListChanged(BlackListChangedNotify blackListChangedNotify);
     }
 }

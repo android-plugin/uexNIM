@@ -40,6 +40,7 @@ import com.netease.nimlib.sdk.chatroom.model.MemberOption;
 import com.netease.nimlib.sdk.friend.FriendService;
 import com.netease.nimlib.sdk.friend.constant.VerifyType;
 import com.netease.nimlib.sdk.friend.model.AddFriendData;
+import com.netease.nimlib.sdk.friend.model.BlackListChangedNotify;
 import com.netease.nimlib.sdk.media.player.AudioPlayer;
 import com.netease.nimlib.sdk.media.player.OnPlayListener;
 import com.netease.nimlib.sdk.media.record.AudioRecorder;
@@ -75,8 +76,10 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.zywx.wbpalmstar.base.BUtility;
 import org.zywx.wbpalmstar.base.ResoureFinder;
+import org.zywx.wbpalmstar.engine.DataHelper;
 import org.zywx.wbpalmstar.engine.EBrowserView;
 import org.zywx.wbpalmstar.engine.universalex.EUExBase;
+import org.zywx.wbpalmstar.engine.universalex.EUExCallback;
 import org.zywx.wbpalmstar.plugin.uexnim.util.CommonUtil;
 import org.zywx.wbpalmstar.plugin.uexnim.util.DataUtil;
 import org.zywx.wbpalmstar.plugin.uexnim.util.NIMConstant;
@@ -107,23 +110,41 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
     private static final String TAG = "EUExNIM";
     private AbortableFuture<LoginInfo> loginRequest;
 
-    private final String MSG_TEAM_ID_EMPTY = "teamId can not be null";
+    private final String MSG_INVALID_SESSION_TYPE = "Invalid sessionType !";
+    private final String MSG_EMPTY_SESSION_ID_FILE_PATH = "sessionId or filePath is empty !";
+    private final String MSG_TEAM_ID_EMPTY = "teamId can not be null!";
+    private final String MSG_INVALID_PARAMS = "invalid params!";
+    private final String MSG_ROOM_ID_EMPTY = "roomId can not be null!";
+    private final String MSG_ROOM_ID_OR_USER_ID_EMPTY = "roomId or userId is empty!";
+
     private ResoureFinder finder;
     private AudioPlayer player;
     private AudioRecorder audioRecorder;
     private String TEMP_PATH = "nim_temp";
+    private static EBrowserView rootEBrowserView;
 
     public EUExNIM(Context context, EBrowserView eBrowserView) {
         super(context, eBrowserView);
         finder = ResoureFinder.getInstance(context);
-    }
+        if ("root".equalsIgnoreCase(eBrowserView.getWindowName())) {
+            registerCallback();
+        }
 
+    }
+    public void registerCallback() {
+        rootEBrowserView = mBrwView;
+    }
     public void registerApp(String params[]) {
         if (params == null || params.length < 1) {
             errorCallback(0, 0, "error params!");
             return;
         }
         String json = params[0];
+        int callbackId = -1;
+        if (params.length == 2 && BUtility.isNumeric(params[1])) {
+            callbackId = Integer.parseInt(params[1]);
+        }
+
         JSONObject jsonObject;
         String appKey = null;
         HashMap<String, Object> result = new HashMap<String, Object>();
@@ -131,8 +152,12 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             jsonObject = new JSONObject(json);
             if (TextUtils.isEmpty(jsonObject.optString("appKey"))) {
                 result.put("result", false);
-                result.put("error", 1);
-                evaluateRootWindowScript(JsConst.CALLBACK_REGISTER_APP, getJSONFromMap(result));
+                if (callbackId != -1) {
+                    callbackToJs(callbackId, false, EUExCallback.F_C_FAILED);
+                } else {
+                    result.put("error", 1);
+                    evaluateRootWindowScript(JsConst.CALLBACK_REGISTER_APP, getJSONFromMap(result).toString());
+                }
                 return;
             }
             appKey = jsonObject.getString("appKey");
@@ -147,7 +172,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         try {
             NIMClient.init(mContext, getLoginInfo(mContext), options);
             result.put("result", true);
-            evaluateRootWindowScript(JsConst.CALLBACK_REGISTER_APP, getJSONFromMap(result));
+            if (callbackId != -1) {
+                callbackToJs(callbackId, false, EUExCallback.F_C_SUCCESS);
+            } else {
+                evaluateRootWindowScript(JsConst.CALLBACK_REGISTER_APP, getJSONFromMap(result).toString());
+            }
         } catch (Exception e) {
             Toast.makeText(mContext,"注册appKey出错!", Toast.LENGTH_SHORT).show();
         }
@@ -207,6 +236,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             return;
         }
         String json = params[0];
+        int funcId = -1;
+        if (params.length == 2 && BUtility.isNumeric(params[1])) {
+            funcId = Integer.parseInt(params[1]);
+        }
+        final int loginCallbackId = funcId;
         JSONObject jsonObject;
         String account = null;
         String password = null;
@@ -218,8 +252,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (TextUtils.isEmpty(account)
                     || TextUtils.isEmpty(password)) {
                 result.put("result", false);
-                result.put("error", "userId or password is empty !");
-                evaluateRootWindowScript(JsConst.CALLBACK_LOGIN, getJSONFromMap(result));
+                String msg = "userId or password is empty !";
+                result.put("error", msg);
+                if (loginCallbackId != -1) {
+                    callbackToJs(loginCallbackId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_LOGIN, getJSONFromMap(result).toString());
+                }
                 return;
             }
         } catch (JSONException e) {
@@ -234,8 +273,6 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         loginRequest.setCallback(new RequestCallback<LoginInfo>() {
             @Override
             public void onSuccess(LoginInfo loginInfo) {
-                Log.i(TAG, "login onSuccess---->");
-                result.put("result", true);
                 result.put("userId", loginInfo.getAccount());
                 //监听状态变化
                 NIMClient.getService(AuthServiceObserver.class).observeOnlineStatus(
@@ -248,7 +285,12 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 SharedPreferencesHelper sharedPreferencesHelper = new SharedPreferencesHelper(mContext, "uexNIM");
                 sharedPreferencesHelper.setUserAccount(accountTemp);
                 sharedPreferencesHelper.setUserToken(passwordTemp);
-                evaluateRootWindowScript(JsConst.CALLBACK_LOGIN, getJSONFromMap(result));
+                if (loginCallbackId != -1) {
+                    callbackToJs(loginCallbackId, false, EUExCallback.F_C_SUCCESS, getJSONFromMap(result));
+                } else {
+                    result.put("result", true);
+                    evaluateRootWindowScript(JsConst.CALLBACK_LOGIN, getJSONFromMap(result).toString());
+                }
             }
 
             @Override
@@ -257,7 +299,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 result.put("result", false);
                 result.put("error", code);
                 result.put("userId", "");
-                evaluateRootWindowScript(JsConst.CALLBACK_LOGIN, getJSONFromMap(result));
+                if (loginCallbackId != -1) {
+                    callbackToJs(loginCallbackId, false, EUExCallback.F_C_FAILED, code);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_LOGIN, getJSONFromMap(result).toString());
+                }
             }
 
             @Override
@@ -265,10 +311,16 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 HashMap<String, Object> result = new HashMap<String, Object>();
                 result.put("result", false);
                 result.put("error", -1); //system error
-                evaluateRootWindowScript(JsConst.CALLBACK_LOGIN, getJSONFromMap(result));
+                if (loginCallbackId != -1) {
+                    callbackToJs(loginCallbackId, false, EUExCallback.F_C_FAILED, -1);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_LOGIN, getJSONFromMap(result).toString());
+                }
             }
         });
     }
+
+
 
     /**
      * 被踢的监听
@@ -277,7 +329,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
     public void onKick(int code) {
         HashMap<String, Object> result = new HashMap<String, Object>();
         result.put("code", code);
-        evaluateRootWindowScript(JsConst.ON_KICK, getJSONFromMap(result));
+        evaluateRootWindowScript(JsConst.ON_KICK, getJSONFromMap(result).toString());
     }
 
     /**
@@ -300,16 +352,29 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
     //退出操作
     public void logout(String params[]) {
+        int logoutCallbackId = -1;
+        if (params.length == 1 && BUtility.isNumeric(params[0])) {
+            logoutCallbackId = Integer.parseInt(params[0]);
+
+        }
         HashMap<String, Object> result = new HashMap<String, Object>();
         try {
             NIMClient.getService(AuthService.class).logout();
             result.put("result", true);
-            evaluateRootWindowScript(JsConst.CALLBACK_LOGOUT, getJSONFromMap(result));
+            if (logoutCallbackId != -1) {
+                callbackToJs(logoutCallbackId, false, EUExCallback.F_C_SUCCESS);
+            } else {
+                evaluateRootWindowScript(JsConst.CALLBACK_LOGOUT, getJSONFromMap(result).toString());
+            }
         } catch (Exception e) {
             e.printStackTrace();
             result.put("result", false);
             result.put("error", e.toString());
-            evaluateRootWindowScript(JsConst.CALLBACK_LOGOUT, getJSONFromMap(result));
+            if (logoutCallbackId != -1) {
+                callbackToJs(logoutCallbackId ,false, EUExCallback.F_C_FAILED, e.toString());
+            } else {
+                evaluateRootWindowScript(JsConst.CALLBACK_LOGOUT, getJSONFromMap(result).toString());
+            }
         }
     }
 
@@ -327,17 +392,24 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String content = null;
         int sessionType = 0;
         Map<String, Object> ext;
+
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
             sessionType = jsonObject.optInt("sessionType");
             content = jsonObject.optString("content");
             if (TextUtils.isEmpty(sessionId)) {
-                Toast.makeText(mContext, "sessionId is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "sessionId is empty !");
+                }
                 return;
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
-                Toast.makeText(mContext, "Invalid sessionType !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_SESSION_TYPE);
+                }
                 return;
             }
             JSONObject extObj = jsonObject.optJSONObject("ext"); //扩展字段
@@ -354,14 +426,16 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, content, NIMConstant.MESSAGE_TYPE_TEXT, sessionType, message);
-            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(
+                    new RequestCallbackTemplate<Void>("sendText", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
         } else {
             IMMessage  message = MessageBuilder.createTextMessage(sessionId, SessionTypeEnum.typeOfValue(sessionType), content);
             if (ext != null) {
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, content, NIMConstant.MESSAGE_TYPE_TEXT, sessionType, message);
-            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(
+                    new RequestCallbackTemplate<Void>("sendText", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
         }
     }
 
@@ -374,7 +448,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         if (content != null) {
             map.put(NIMConstant.TEXT_CONTENT, content);
         }
-        evaluateRootWindowScript(JsConst.WILL_SEND_MESSAGE, getJSONFromMap(map));
+        evaluateRootWindowScript(JsConst.WILL_SEND_MESSAGE, getJSONFromMap(map).toString());
     }
 
     public void sendImage(String params[]) {
@@ -389,6 +463,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         int sessionType = 0;
         String displayName;
         Map<String, Object> ext;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -396,11 +472,15 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             filePath = jsonObject.optString("filePath");
             displayName = jsonObject.optString("displayName");
             if (TextUtils.isEmpty(sessionId) || TextUtils.isEmpty(filePath)) {
-                Toast.makeText(mContext, "sessionId or filePath is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_EMPTY_SESSION_ID_FILE_PATH);
+                }
                 return;
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
-                Toast.makeText(mContext, "Invalid sessionType !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_SESSION_TYPE);
+                }
                 return;
             }
             JSONObject extObj = jsonObject.optJSONObject("ext"); //扩展字段
@@ -417,7 +497,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_IMAGE, sessionType, message);
-            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(
+                    new RequestCallbackTemplate<Void>("sendImage", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
 
         } else {
             // 创建图片消息
@@ -431,7 +512,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_IMAGE, sessionType, message);
-            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(
+                    new RequestCallbackTemplate<Void>("sendImage", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
         }
 
 
@@ -443,7 +525,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         public void onSuccess(Void avoid) {
             HashMap<String, Object> result = new HashMap<String, Object>();
             result.put("result", true);
-            evaluateRootWindowScript(JsConst.CALLBACK_DID_SEND_MESSAGE, getJSONFromMap(result));
+            evaluateRootWindowScript(JsConst.CALLBACK_DID_SEND_MESSAGE, getJSONFromMap(result).toString());
         }
 
         @Override
@@ -451,7 +533,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             HashMap<String, Object> result = new HashMap<String, Object>();
             result.put("result", false);
             result.put("error", code);
-            evaluateRootWindowScript(JsConst.CALLBACK_DID_SEND_MESSAGE, getJSONFromMap(result));
+            evaluateRootWindowScript(JsConst.CALLBACK_DID_SEND_MESSAGE, getJSONFromMap(result).toString());
         }
 
         @Override
@@ -459,7 +541,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             HashMap<String, Object> result = new HashMap<String, Object>();
             result.put("result", false);
             result.put("error", throwable.getMessage());
-            evaluateRootWindowScript(JsConst.CALLBACK_DID_SEND_MESSAGE, getJSONFromMap(result));
+            evaluateRootWindowScript(JsConst.CALLBACK_DID_SEND_MESSAGE, getJSONFromMap(result).toString());
 
         }
     };
@@ -477,6 +559,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         int sessionType = 0;
         String title = "";
         Map<String, Object> ext;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -485,11 +569,15 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             longitude = jsonObject.optDouble("longitude");
             title = jsonObject.optString("title");
             if (TextUtils.isEmpty(sessionId)) {
-                Toast.makeText(mContext, "sessionId is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "sessionId is empty !");
+                }
                 return;
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
-                Toast.makeText(mContext, "Invalid sessionType !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_SESSION_TYPE);
+                }
                 return;
             }
             JSONObject extObj = jsonObject.optJSONObject("ext"); //扩展字段
@@ -507,7 +595,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_IMAGE, sessionType, message);
-            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(
+                    new RequestCallbackTemplate<Void>("sendLocationMsg", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
         } else {
             // 发送其他类型的消息代码类似，演示如下
             // 创建地理位置消息
@@ -522,7 +611,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_LOCATION, sessionType, message);
-            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(
+                    new RequestCallbackTemplate<Void>("sendLocationMsg", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
         }
     }
 
@@ -539,17 +629,23 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String filePath = null;
         int sessionType = 0;
         Map<String, Object> ext;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
             sessionType = jsonObject.optInt("sessionType");
             filePath = jsonObject.optString("filePath");
             if (TextUtils.isEmpty(sessionId) || TextUtils.isEmpty(filePath)) {
-                Toast.makeText(mContext, "sessionId or filePath is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_EMPTY_SESSION_ID_FILE_PATH);
+                }
                 return;
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
-                Toast.makeText(mContext, "Invalid sessionType !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_SESSION_TYPE);
+                }
                 return;
             }
             JSONObject extObj = jsonObject.optJSONObject("ext"); //扩展字段
@@ -570,7 +666,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_AUDIO, sessionType, message);
-            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(
+                    new RequestCallbackTemplate<Void>("sendAudio", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
         } else {
             IMMessage  message = MessageBuilder.createAudioMessage(
                     sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
@@ -582,7 +679,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_AUDIO, sessionType, message);
-            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(
+                    new RequestCallbackTemplate<Void>("sendAudio", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
         }
     }
 
@@ -599,6 +697,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         int sessionType = 0;
         String displayName;
         Map<String, Object> ext;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -606,11 +706,15 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             filePath = jsonObject.optString("filePath");
             displayName = jsonObject.optString("displayName");
             if (TextUtils.isEmpty(sessionId) || TextUtils.isEmpty(filePath)) {
-                Toast.makeText(mContext, "sessionId or filePath is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_EMPTY_SESSION_ID_FILE_PATH);
+                }
                 return;
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
-                Toast.makeText(mContext, "Invalid sessionType !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_SESSION_TYPE);
+                }
                 return;
             }
             JSONObject extObj = jsonObject.optJSONObject("ext"); //扩展字段
@@ -632,7 +736,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_VIDEO, sessionType, message);
-            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(
+                    new RequestCallbackTemplate<Void>("sendVideo", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
         } else {
             // 创建视频消息
             IMMessage message = MessageBuilder.createVideoMessage(
@@ -648,7 +753,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_VIDEO, sessionType, message);
-            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(
+                    new RequestCallbackTemplate<Void>("sendVideo", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
         }
     }
 
@@ -665,6 +771,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         int sessionType = 0;
         String displayName;
         Map<String, Object> ext;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -672,11 +780,15 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             filePath = jsonObject.optString("filePath");
             displayName = jsonObject.optString("displayName");
             if (TextUtils.isEmpty(sessionId) || TextUtils.isEmpty(filePath)) {
-                Toast.makeText(mContext, "sessionId or filePath is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_EMPTY_SESSION_ID_FILE_PATH);
+                }
                 return;
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
-                Toast.makeText(mContext, "Invalid sessionType !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_SESSION_TYPE);
+                }
                 return;
             }
             JSONObject extObj = jsonObject.optJSONObject("ext"); //扩展字段
@@ -693,7 +805,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_FILE, sessionType, message);
-            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+            NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(
+                    new RequestCallbackTemplate<Void>("sendFile", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
         } else {
             IMMessage message = MessageBuilder.createFileMessage(
                     sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
@@ -704,20 +817,31 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_FILE, sessionType, message);
-            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(sendMsgCallback);
+            NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(
+                    new RequestCallbackTemplate<Void>("sendFile", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
         }
     }
 
     //获取最近会话
     public void allRecentSession(String params[]) {
+        int callbackId = -1;
+        if (params.length == 1 && BUtility.isNumeric(params[0])) {
+            callbackId = Integer.parseInt(params[0]);
+        }
+        final int funcCallbackId = callbackId;
         NIMClient.getService(MsgService.class).queryRecentContacts().setCallback(new RequestCallbackWrapper<List<RecentContact>>() {
             @Override
             public void onResult(int code, List<RecentContact> recents, Throwable e) {
                 HashMap<String, Object> map = new HashMap<String, Object>();
                 if (code != ResponseCode.RES_SUCCESS || recents == null || recents.size() == 0) {
                     map.put(NIMConstant.TEXT_RESULT, false);
-                    map.put(NIMConstant.TEXT_ERROR, "无最近会话消息");
-                    evaluateRootWindowScript(JsConst.CALLBACK_ALL_RECENT_SESSION, getJSONFromMap(map));
+                    String msg = "无最近会话消息";
+                    map.put(NIMConstant.TEXT_ERROR, msg);
+                    if (funcCallbackId != -1) {
+                        callbackToJs(funcCallbackId, false, EUExCallback.F_C_FAILED, msg);
+                    } else {
+                        evaluateRootWindowScript(JsConst.CALLBACK_ALL_RECENT_SESSION, getJSONFromMap(map).toString());
+                    }
                     return;
                 }
                 List<RecentSessionVo> list = new ArrayList<RecentSessionVo>();
@@ -763,7 +887,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     list.add(recentVo);
                 }
                 map.put("sessions", list);
-                evaluateRootWindowScript(JsConst.CALLBACK_ALL_RECENT_SESSION, new Gson().toJson(map));
+                if (funcCallbackId != -1) {
+                    callbackToJs(funcCallbackId, false, EUExCallback.F_C_SUCCESS, DataHelper.gson.toJsonTree(map));
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_ALL_RECENT_SESSION, new Gson().toJson(map));
+                }
             }
         });
     }
@@ -785,6 +913,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         int order = 0;
         boolean sync = false;
         long startTime = 0l;
+        int id = -1;
+        if (params.length == 2 && BUtility.isNumeric(params[1])) {
+            id = Integer.parseInt(params[1]);
+        }
+        final int callbackId = id;
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -812,14 +945,22 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     list.add(DataUtil.trans2MessageVo(msg));
                 }
                 result.put("messages", list);
-                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_MESSAGE_HISTORY, new Gson().toJson(list));
+                if (callbackId != -1) {
+                    callbackToJs(callbackId, false, EUExCallback.F_C_SUCCESS, DataHelper.gson.toJsonTree(result));
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_FETCH_MESSAGE_HISTORY, new Gson().toJson(list));
+                }
             }
 
             @Override
             public void onFailed(int code) {
                 HashMap<String, Object> result = new HashMap<String, Object>();
                 result.put("error", code);
-                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_MESSAGE_HISTORY, getJSONFromMap(result));
+                if (callbackId != -1) {
+                    callbackToJs(callbackId, false, EUExCallback.F_C_FAILED, code);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_FETCH_MESSAGE_HISTORY, getJSONFromMap(result).toString());
+                }
 
             }
 
@@ -827,7 +968,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             public void onException(Throwable throwable) {
                 HashMap<String, Object> result = new HashMap<String, Object>();
                 result.put("error", throwable.getMessage());
-                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_MESSAGE_HISTORY, getJSONFromMap(result));
+                if (callbackId != -1) {
+                    callbackToJs(callbackId, false, EUExCallback.F_C_FAILED, throwable.getMessage());
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_FETCH_MESSAGE_HISTORY, getJSONFromMap(result).toString());
+                }
             }
         });
     }
@@ -835,10 +980,10 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      /**
      *切换音频的输出设备
      */
-    public void switchAudioOutputDevice(String params []) {
+    public boolean switchAudioOutputDevice(String params []) {
         if (params == null || params.length < 1) {
             errorCallback(0, 0, "error params!");
-            return;
+            return false;
         }
         String json = params[0];
         JSONObject jsonObject;
@@ -860,16 +1005,18 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         HashMap<String, Object> result = new HashMap<String, Object>();
         result.put("result", true);
-        evaluateRootWindowScript(JsConst.CALLBACK_SWITCH_AUTIO_OUTPUT_DEVICE, getJSONFromMap(result));
+        evaluateRootWindowScript(JsConst.CALLBACK_SWITCH_AUTIO_OUTPUT_DEVICE, getJSONFromMap(result).toString());
+        return true;
     }
 
-    public void isPlaying(String params[]) {
+    public boolean isPlaying(String params[]) {
         if (player == null) {
             player = new AudioPlayer(mContext);
         }
         HashMap<String, Object> result = new HashMap<String, Object>();
         result.put("result", player.isPlaying());
-        evaluateRootWindowScript(JsConst.CALLBACK_IS_PLAYING, getJSONFromMap(result));
+        evaluateRootWindowScript(JsConst.CALLBACK_IS_PLAYING, getJSONFromMap(result).toString());
+        return player.isPlaying();
     }
 
     public void playAudio(String params[]) {
@@ -883,6 +1030,9 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
         }
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        final int funcId = flag ? Integer.parseInt(params[1]) : -1;
+
         final String realPath = getRealPath(filePath);
         final String tempPath = filePath ;
         if (player == null) {
@@ -894,14 +1044,25 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             public void onPrepared() {
                 HashMap<String, Object> map = new HashMap<String, Object>();
                 map.put("filePath", tempPath);
-                evaluateRootWindowScript(JsConst.CALLBACK_BEGAN_PLAY_AUDIO, getJSONFromMap(map));
+                map.put("status", 1);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, getJSONFromMap(map));
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_BEGAN_PLAY_AUDIO, getJSONFromMap(map).toString());
+                }
+
             }
 
             @Override
             public void onCompletion() {
                 HashMap<String, Object> map = new HashMap<String, Object>();
                 map.put("filePath", tempPath);
-                evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_PLAY_AUDIO, getJSONFromMap(map));
+                map.put("status", 2);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, getJSONFromMap(map));
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_PLAY_AUDIO, getJSONFromMap(map).toString());
+                }
             }
 
             @Override
@@ -933,6 +1094,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         if (!player.isPlaying()) {
             return;
         }
+        boolean flag = params.length == 1 && BUtility.isNumeric(params[0]);
+        final int funcId = flag ? Integer.parseInt(params[0]) : -1;
         player.setOnPlayListener(new OnPlayListener() {
             @Override
             public void onPrepared() {
@@ -942,12 +1105,21 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             @Override
             public void onCompletion() {
                 Log.i(TAG, "[stopPlay]----onCompletion----");
-                evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_PLAY_AUDIO, null);
+                if(funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_PLAY_AUDIO, null);
+                }
             }
 
             @Override
             public void onInterrupt() {
                 Log.i(TAG, "[stopPlay]----onInterrupt----");
+                if(funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_PLAY_AUDIO, null);
+                }
             }
 
             @Override
@@ -966,14 +1138,16 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      * 判断是否正在录制音频
      * @param params
      */
-    public void isRecording(String params[]) {
+    public boolean isRecording(String params[]) {
         HashMap<String, Object> result = new HashMap<String, Object>();
+        boolean flag = false;
         if (audioRecorder != null) {
-            result.put("result", audioRecorder.isRecording());
-        } else {
-            result.put("result", false);
+            flag = audioRecorder.isRecording();
+
         }
-        evaluateRootWindowScript(JsConst.CALLBACK_IS_RECORDING, getJSONFromMap(result));
+        result.put("result", flag);
+        evaluateRootWindowScript(JsConst.CALLBACK_IS_RECORDING, getJSONFromMap(result).toString());
+        return flag;
     }
 
     /**
@@ -998,6 +1172,9 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
         }
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        final int funcId = flag ? Integer.parseInt(params[1]) : -1;
+
         if (audioRecorder == null) {
             audioRecorder = getAudioRecorder(duration, new IAudioRecordCallback() {
                 private File audioFile = null;
@@ -1010,13 +1187,23 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 public void onRecordStart(File file, RecordType recordType) {
                     audioFile = file;
                     result.put("filePath", file.getAbsolutePath());
-                    evaluateRootWindowScript(JsConst.CALLBACK_BEGAN_RECORD_AUDIO,getJSONFromMap(result));
+                    result.put("status", 1);
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, getJSONFromMap(result));
+                    } else {
+                        evaluateRootWindowScript(JsConst.CALLBACK_BEGAN_RECORD_AUDIO, getJSONFromMap(result).toString());
+                    }
                 }
 
                 @Override
                 public void onRecordSuccess(File file, long l, RecordType recordType) {
                     Log.i(TAG, "[record audio success]");
-                    evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_RECORD_AUDIO, getJSONFromMap(result));
+                    result.put("status", 2);
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, getJSONFromMap(result));
+                    } else {
+                        evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_RECORD_AUDIO, getJSONFromMap(result).toString());
+                    }
                 }
 
                 @Override
@@ -1026,13 +1213,23 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
                 @Override
                 public void onRecordCancel() {
-                    evaluateRootWindowScript(JsConst.CALLBACK_CANCEL_RECORD_AUTIO, null);
+                    result.put("status", 3);
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, getJSONFromMap(result));
+                    } else {
+                        evaluateRootWindowScript(JsConst.CALLBACK_CANCEL_RECORD_AUTIO, getJSONFromMap(result).toString());
+                    }
                 }
 
                 @Override
                 public void onRecordReachedMaxTime(int i) {
                     result.put("filePath", audioFile.getAbsolutePath());
-                    evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_RECORD_AUDIO,getJSONFromMap(result));
+                    result.put("status", 2);
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, getJSONFromMap(result));
+                    } else {
+                        evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_RECORD_AUDIO, getJSONFromMap(result).toString());
+                    }
                 }
             });
         }
@@ -1072,6 +1269,9 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      * @param params
      */
     public void allMyTeams(String params[]) {
+        boolean flag = params.length == 1 && BUtility.isNumeric(params[0]);
+        final int funcId = flag ? Integer.parseInt(params[0]): -1 ;
+
         NIMClient.getService(TeamService.class).queryTeamList().setCallback(new RequestCallback<List<Team>>() {
             @Override
             public void onSuccess(List<Team> teams) {
@@ -1082,7 +1282,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     list.add(vo);
                 }
                 result.put("teams", list);
-                evaluateRootWindowScript(JsConst.CALLBACK_ALL_MY_TEAMS, new Gson().toJson(result));
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, DataHelper.gson.toJsonTree(result));
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_ALL_MY_TEAMS, new Gson().toJson(result));
+                }
             }
 
             @Override
@@ -1090,7 +1294,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 Log.i(TAG, "[Query Team List Failed] error:" + i);
                 HashMap<String, Object> result = new HashMap<String, Object>();
                 result.put("error", i);
-                evaluateRootWindowScript(JsConst.CALLBACK_ALL_MY_TEAMS, getJSONFromMap(result));
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, i);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_ALL_MY_TEAMS, getJSONFromMap(result).toString());
+                }
 
             }
 
@@ -1099,7 +1307,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 Log.i(TAG, "[Query Team List Exception] error:" + throwable.getMessage());
                 HashMap<String, Object> result = new HashMap<String, Object>();
                 result.put("error", throwable.getMessage());
-                evaluateRootWindowScript(JsConst.CALLBACK_ALL_MY_TEAMS, getJSONFromMap(result));
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, throwable.getMessage());
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_ALL_MY_TEAMS, getJSONFromMap(result).toString());
+                }
             }
         });
     }
@@ -1123,15 +1335,18 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             teamId = jsonObject.optString("teamId");
             if (TextUtils.isEmpty(teamId)) {
                 result.put("error", MSG_TEAM_ID_EMPTY);
-                evaluateRootWindowScript(JsConst.CALLBACK_TEAM_BY_ID, getJSONFromMap(result));
+                evaluateRootWindowScript(JsConst.CALLBACK_TEAM_BY_ID, getJSONFromMap(result).toString());
                 return;
             }
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
 
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        final int funcId = flag ? Integer.parseInt(params[1]) : -1;
+
         NIMClient.getService(TeamService.class).queryTeam(teamId).setCallback(
-                new RequestCallbackTemplate<Team>("teamById", JsConst.CALLBACK_TEAM_BY_ID, new CustomDataUtil<Team>() {
+                new RequestCallbackTemplate<Team>("teamById", funcId, JsConst.CALLBACK_TEAM_BY_ID, new CustomDataUtil<Team>() {
                     @Override
                     public String getDataStr(Team team) {
                         HashMap<String, Object> result = new HashMap<String, Object>();
@@ -1139,7 +1354,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                         result.put("team", vo);
                         return new Gson().toJson(result);
                     }
-                }));
+                })
+        );
     }
 
     /**
@@ -1161,34 +1377,24 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             teamId = jsonObject.optString("teamId");
             if (TextUtils.isEmpty(teamId)) {
                 result.put("error", MSG_TEAM_ID_EMPTY);
-                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_INFO, getJSONFromMap(result));
+                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_INFO, getJSONFromMap(result).toString());
                 return;
             }
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
-        NIMClient.getService(TeamService.class).searchTeam(teamId).setCallback(new RequestCallback<Team>() {
-            @Override
-            public void onSuccess(Team team) {
-                TeamVo vo = DataUtil.trans2TeamVo(team);
-                result.put("team", vo);
-                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_INFO, new Gson().toJson(result));
-            }
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        final int funcId = flag ? Integer.parseInt(params[1]) : -1;
 
-            @Override
-            public void onFailed(int i) {
-                Log.i(TAG, "[Query Team By Id Failed] error:" + i);
-                result.put("error", i);
-                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_INFO, getJSONFromMap(result));
-            }
-
-            @Override
-            public void onException(Throwable throwable) {
-                Log.i(TAG, "[Query Team By Id Exception] error:" + throwable.getMessage());
-                result.put("error", throwable.getMessage());
-                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_INFO, getJSONFromMap(result));
-            }
-        });
+        NIMClient.getService(TeamService.class).searchTeam(teamId).setCallback(
+                new RequestCallbackTemplate<Team>("fetchTeamInfo", funcId, JsConst.CALLBACK_FETCH_TEAM_INFO, new CustomDataUtil<Team>() {
+                    @Override
+                    public String getDataStr(Team team) {
+                        TeamVo vo = DataUtil.trans2TeamVo(team);
+                        result.put("team", vo);
+                        return new Gson().toJson(result);
+                    }
+                }));
     }
 
     /**
@@ -1244,27 +1450,19 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             fields.put(TeamFieldEnum.Introduce, intro);
             fields.put(TeamFieldEnum.VerifyType, verifyType);
             fields.put(TeamFieldEnum.Announcement, announcement);
-            NIMClient.getService(TeamService.class).createTeam(fields, teamType, postscript, userIdList).setCallback(new RequestCallback<Team>() {
-                @Override
-                public void onSuccess(Team team) {
-                    result.put("teamId", team.getId());
-                    result.put("error", "");
-                    evaluateRootWindowScript(JsConst.CALLBACK_CREATE_TEAM, getJSONFromMap(result));
-                }
 
-                @Override
-                public void onFailed(int i) {
-                    result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_CREATE_TEAM, getJSONFromMap(result));
+            boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+            final int funcId = flag ? Integer.parseInt(params[1]) : -1;
 
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_CREATE_TEAM, getJSONFromMap(result));
-                }
-            });
+            NIMClient.getService(TeamService.class).createTeam(fields, teamType, postscript, userIdList).setCallback(
+                    new RequestCallbackTemplate<Team>("createTeam", funcId, JsConst.CALLBACK_CREATE_TEAM, new CustomDataUtil<Team>() {
+                        @Override
+                        public String getDataStr(Team team) {
+                            result.put("teamId", team.getId());
+                            result.put("error", "");
+                            return getJSONFromMap(result).toString();
+                        }
+                    }));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1288,14 +1486,14 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             String teamId = jsonObject.optString("teamId");
             if (TextUtils.isEmpty(teamId)) {
                 result.put("error", MSG_TEAM_ID_EMPTY);
-                evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result));
+                evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result).toString());
                 return;
             }
             String usersStr = jsonObject.optString("users");
             JSONArray users = new JSONArray(usersStr);
             if (users == null || users.length() < 1) {
                 result.put("error", "users can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result));
+                evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result).toString());
                 return;
             }
             List <String> userList = new ArrayList<String>();
@@ -1303,23 +1501,42 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             for (int i = 0; i < len; i++) {
                 userList.add(users.getString(i));
             }
+            boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+            final int funcId = flag ? Integer.parseInt(params[1]) : -1;
+
             NIMClient.getService(TeamService.class).addMembers(teamId, userList).setCallback(new RequestCallback<Void>() {
                 @Override
                 public void onSuccess(Void aVoid) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result));
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
+                    } else {
+                        evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result).toString());
+                    }
                 }
 
                 @Override
                 public void onFailed(int i) {
                     //高级群不能直接拉人，发出邀请成功会返回810，此处应该认为邀请已发出
-                    result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result));
+                    if (funcId != -1) {
+                        if (i == 810) {
+                            callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
+                        } else {
+                            callbackToJs(funcId, false, EUExCallback.F_C_FAILED, i);
+                        }
+                    } else {
+                        result.put("error", i);
+                        evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result).toString());
+                    }
                 }
 
                 @Override
                 public void onException(Throwable throwable) {
-                    result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result));
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_FAILED);
+                    } else {
+                        result.put("error", throwable.getMessage());
+                        evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result).toString());
+                    }
                 }
             });
         } catch (JSONException e) {
@@ -1345,27 +1562,31 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             String inviterId = jsonObject.optString("invitorId"); //invitorId--文档的拼写错误
             if (TextUtils.isEmpty(teamId) || TextUtils.isEmpty(inviterId)) {
                 result.put("error", "teamId or invitorId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result));
+                evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result).toString());
                 return;
             }
             NIMClient.getService(TeamService.class).acceptInvite(teamId, inviterId).setCallback(new RequestCallback<Void>() {
                 @Override
                 public void onSuccess(Void aVoid) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result));
+                    evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result).toString());
                 }
 
                 @Override
                 public void onFailed(int i) {
                     result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result));
+                    evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result).toString());
                 }
 
                 @Override
                 public void onException(Throwable throwable) {
                     result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result));
+                    evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result).toString());
                 }
             });
+            boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+            final int funcId = flag ? Integer.parseInt(params[1]) : -1;
+            NIMClient.getService(TeamService.class).acceptInvite(teamId, inviterId).setCallback(
+                    new RequestCallbackTemplate<Void>("acceptInviteWithTeam", funcId, JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1388,29 +1609,22 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             String teamId = jsonObject.optString("teamId");
             String inviterId = jsonObject.optString("invitorId"); //invitorId--文档的拼写错误
             String rejectReason = jsonObject.optString("rejectReason");
+            boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+            final int funcId = flag ? Integer.parseInt(params[1]) : -1;
+
             if (TextUtils.isEmpty(teamId) || TextUtils.isEmpty(inviterId)) {
-                result.put("error", "teamId or invitorId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_REJECT_INVITE_WITH_TEAM, getJSONFromMap(result));
+                String msg = "teamId or invitorId can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_REJECT_INVITE_WITH_TEAM, getJSONFromMap(result).toString());
+                }
                 return;
             }
-            NIMClient.getService(TeamService.class).declineInvite(teamId, inviterId, rejectReason).setCallback(new RequestCallback<Void>() {
-                @Override
-                public void onSuccess(Void aVoid) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_REJECT_INVITE_WITH_TEAM, getJSONFromMap(result));
-                }
 
-                @Override
-                public void onFailed(int i) {
-                    result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_REJECT_INVITE_WITH_TEAM, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_REJECT_INVITE_WITH_TEAM, getJSONFromMap(result));
-                }
-            });
+            NIMClient.getService(TeamService.class).declineInvite(teamId, inviterId, rejectReason).setCallback(
+                    new RequestCallbackTemplate<Void>("rejectInviteWithTeam", funcId, JsConst.CALLBACK_REJECT_INVITE_WITH_TEAM));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1428,19 +1642,29 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        final int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             String message = jsonObject.optString("message");
             if (TextUtils.isEmpty(teamId)) {
-                result.put("error", "teamId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_APPLY_JOIN_TEAM, getJSONFromMap(result));
+                result.put("error", MSG_TEAM_ID_EMPTY);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_TEAM_ID_EMPTY);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_APPLY_JOIN_TEAM, getJSONFromMap(result).toString());
+                }
                 return;
             }
             NIMClient.getService(TeamService.class).applyJoinTeam(teamId, message).setCallback(new RequestCallback<Team>() {
                 @Override
                 public void onSuccess(Team team) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_APPLY_JOIN_TEAM, getJSONFromMap(result));
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
+                    } else {
+                        evaluateRootWindowScript(JsConst.CALLBACK_APPLY_JOIN_TEAM, getJSONFromMap(result).toString());
+                    }
                 }
 
                 @Override
@@ -1452,13 +1676,21 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     } else {
                         result.put("error", code);
                     }
-                    evaluateRootWindowScript(JsConst.CALLBACK_APPLY_JOIN_TEAM, getJSONFromMap(result));
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, result);
+                    } else {
+                        evaluateRootWindowScript(JsConst.CALLBACK_APPLY_JOIN_TEAM, getJSONFromMap(result).toString());
+                    }
                 }
 
                 @Override
                 public void onException(Throwable throwable) {
                     result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_APPLY_JOIN_TEAM, getJSONFromMap(result));
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_FAILED, throwable.getMessage());
+                    } else {
+                        evaluateRootWindowScript(JsConst.CALLBACK_APPLY_JOIN_TEAM, getJSONFromMap(result).toString());
+                    }
                 }
             });
         } catch (JSONException e) {
@@ -1478,19 +1710,29 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        final int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             String userId = jsonObject.optString("userId");
             if (TextUtils.isEmpty(teamId) || TextUtils.isEmpty(userId)) {
-                result.put("error", "teamId or userId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_PASS_APPLY_JOIN_TO_TEAM, getJSONFromMap(result));
+                if(funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "teamId or userId can not be null");
+                } else {
+                    result.put("error", "teamId or userId can not be null");
+                    evaluateRootWindowScript(JsConst.CALLBACK_PASS_APPLY_JOIN_TO_TEAM, getJSONFromMap(result).toString());
+                }
                 return;
             }
             NIMClient.getService(TeamService.class).passApply(teamId, userId).setCallback(new RequestCallback<Void>() {
                 @Override
                 public void onSuccess(Void aVoid) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_PASS_APPLY_JOIN_TO_TEAM, getJSONFromMap(result));
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
+                    } else {
+                        evaluateRootWindowScript(JsConst.CALLBACK_PASS_APPLY_JOIN_TO_TEAM, getJSONFromMap(result).toString());
+                    }
                 }
 
                 @Override
@@ -1500,13 +1742,17 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     } else {
                         result.put("error", code);
                     }
-                    evaluateRootWindowScript(JsConst.CALLBACK_PASS_APPLY_JOIN_TO_TEAM, getJSONFromMap(result));
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_FAILED, result);
+                        return;
+                    }
+                    evaluateRootWindowScript(JsConst.CALLBACK_PASS_APPLY_JOIN_TO_TEAM, getJSONFromMap(result).toString());
                 }
 
                 @Override
                 public void onException(Throwable throwable) {
                     result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_PASS_APPLY_JOIN_TO_TEAM, getJSONFromMap(result));
+                    evaluateRootWindowScript(JsConst.CALLBACK_PASS_APPLY_JOIN_TO_TEAM, getJSONFromMap(result).toString());
                 }
             });
         } catch (JSONException e) {
@@ -1526,20 +1772,30 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        final int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             String userId = jsonObject.optString("userId");
             String rejectReason = jsonObject.optString("rejectReason", "");
             if (TextUtils.isEmpty(teamId) || TextUtils.isEmpty(userId)) {
-                result.put("error", "teamId or userId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_REJECT_APPLY_JOIN_TO_TEAM, getJSONFromMap(result));
+                if(funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "teamId or userId can not be null");
+                } else {
+                    result.put("error", "teamId or userId can not be null");
+                    evaluateRootWindowScript(JsConst.CALLBACK_REJECT_APPLY_JOIN_TO_TEAM, getJSONFromMap(result).toString());
+                }
                 return;
             }
             NIMClient.getService(TeamService.class).rejectApply(teamId, userId, rejectReason).setCallback(new RequestCallback<Void>() {
                 @Override
                 public void onSuccess(Void aVoid) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_REJECT_APPLY_JOIN_TO_TEAM, getJSONFromMap(result));
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
+                        return;
+                    }
+                    evaluateRootWindowScript(JsConst.CALLBACK_REJECT_APPLY_JOIN_TO_TEAM, getJSONFromMap(result).toString());
                 }
 
                 @Override
@@ -1549,13 +1805,17 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     } else {
                         result.put("error", code);
                     }
-                    evaluateRootWindowScript(JsConst.CALLBACK_REJECT_APPLY_JOIN_TO_TEAM, getJSONFromMap(result));
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_FAILED, DataHelper.gson.toJsonTree(result));
+                        return;
+                    }
+                    evaluateRootWindowScript(JsConst.CALLBACK_REJECT_APPLY_JOIN_TO_TEAM, getJSONFromMap(result).toString());
                 }
 
                 @Override
                 public void onException(Throwable throwable) {
                     result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_REJECT_APPLY_JOIN_TO_TEAM, getJSONFromMap(result));
+                    evaluateRootWindowScript(JsConst.CALLBACK_REJECT_APPLY_JOIN_TO_TEAM, getJSONFromMap(result).toString());
                 }
             });
         } catch (JSONException e) {
@@ -1575,11 +1835,14 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
+
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             String teamName = jsonObject.optString("teamName");
-            updateTeamInfo(TeamFieldEnum.Name, teamId, teamName);
+            updateTeamInfo(TeamFieldEnum.Name, teamId, teamName, funcId);
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1597,11 +1860,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             String intro = jsonObject.optString("intro");
-            updateTeamInfo(TeamFieldEnum.Introduce, teamId, intro);
+            updateTeamInfo(TeamFieldEnum.Introduce, teamId, intro, funcId);
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1619,11 +1884,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             String announcement = jsonObject.optString("announcement");
-            updateTeamInfo(TeamFieldEnum.Announcement, teamId, announcement);
+            updateTeamInfo(TeamFieldEnum.Announcement, teamId, announcement, funcId);
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1640,11 +1907,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             String joinMode = jsonObject.optString("joinMode");
-            updateTeamInfo(TeamFieldEnum.VerifyType, teamId, joinMode);
+            updateTeamInfo(TeamFieldEnum.VerifyType, teamId, joinMode, funcId);
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1656,35 +1925,56 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      * @param teamId
      * @param value
      */
-    private void updateTeamInfo(TeamFieldEnum fieldType, String teamId, Serializable value) {
+    private void updateTeamInfo(TeamFieldEnum fieldType, String teamId, Serializable value, int funcId) {
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String callbackFunTemp = "";
+        String msg = "";
         if (fieldType == TeamFieldEnum.Name) {
             callbackFunTemp = JsConst.CALLBACK_UPDATE_TEAM_NAME;
             if (TextUtils.isEmpty(teamId) || TextUtils.isEmpty((String)value)) {
-                result.put("error", "teamId or teamName can not be null");
-                evaluateRootWindowScript(callbackFunTemp, getJSONFromMap(result));
+                msg = "teamId or teamName can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "teamId or teamName can not be null");
+                } else {
+                    evaluateRootWindowScript(callbackFunTemp, getJSONFromMap(result).toString());
+                }
                 return;
             }
         } else if (fieldType == TeamFieldEnum.Introduce){
             callbackFunTemp = JsConst.CALLBACK_UPDATE_TEAM_INTRO;
             if (TextUtils.isEmpty(teamId) || TextUtils.isEmpty((String)value)) {
-                result.put("error", "teamId or intro can not be null");
-                evaluateRootWindowScript(callbackFunTemp, getJSONFromMap(result));
+                msg = "teamId or intro can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "teamId or teamName can not be null");
+                } else {
+                    evaluateRootWindowScript(callbackFunTemp, getJSONFromMap(result).toString());
+                }
                 return;
             }
         } else if (fieldType == TeamFieldEnum.Announcement) {
             callbackFunTemp = JsConst.CALLBACK_UPDATE_TEAM_ANNOUNCEMENT;
             if (TextUtils.isEmpty(teamId) || TextUtils.isEmpty((String)value)) {
-                result.put("error", "teamId or announcement can not be null");
-                evaluateRootWindowScript(callbackFunTemp, getJSONFromMap(result));
+                msg = "teamId or announcement can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(callbackFunTemp, getJSONFromMap(result).toString());
+                }
                 return;
             }
         } else if (fieldType == TeamFieldEnum.VerifyType) {
             callbackFunTemp = JsConst.CALLBACK_UPDATE_TEAM_JOIN_MODE;
             if (TextUtils.isEmpty(teamId) || TextUtils.isEmpty((String)value)) {
-                result.put("error", "teamId or joinMode can not be null");
-                evaluateRootWindowScript(callbackFunTemp, getJSONFromMap(result));
+                msg = "teamId or joinMode can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(callbackFunTemp, getJSONFromMap(result).toString());
+                }
                 return;
             }
 
@@ -1701,21 +1991,23 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         NIMClient.getService(TeamService.class).updateTeam(teamId, fieldType, value).setCallback(new RequestCallback<Void>() {
             @Override
             public void onSuccess(Void aVoid) {
-                evaluateRootWindowScript(callbackFun, getJSONFromMap(result));
+                evaluateRootWindowScript(callbackFun, getJSONFromMap(result).toString());
             }
 
             @Override
             public void onFailed(int i) {
                 result.put("error", i);
-                evaluateRootWindowScript(callbackFun, getJSONFromMap(result));
+                evaluateRootWindowScript(callbackFun, getJSONFromMap(result).toString());
             }
 
             @Override
             public void onException(Throwable throwable) {
                 result.put("error", throwable.getMessage());
-                evaluateRootWindowScript(callbackFun, getJSONFromMap(result));
+                evaluateRootWindowScript(callbackFun, getJSONFromMap(result).toString());
             }
         });
+        NIMClient.getService(TeamService.class).updateTeam(teamId, fieldType, value).setCallback(
+                new RequestCallbackTemplate<Void>("updateTeamInfo", funcId, callbackFun));
     }
 
     /**
@@ -1730,6 +2022,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
@@ -1737,8 +2031,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             JSONArray users = new JSONArray(usersStr);
 
             if (TextUtils.isEmpty(teamId) || users == null || users.length() < 1) {
-                result.put("error", "teamId or users can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_ADD_MANAGER_TO_TEAM, getJSONFromMap(result));
+                String msg = "teamId or users can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_ADD_MANAGER_TO_TEAM, getJSONFromMap(result).toString());
+                }
                 return;
             }
 
@@ -1747,24 +2046,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             for (int i = 0; i < len; i++) {
                 userList.add(users.getString(i));
             }
-            NIMClient.getService(TeamService.class).addManagers(teamId, userList).setCallback(new RequestCallback<List<TeamMember>>() {
-                @Override
-                public void onSuccess(List<TeamMember> teamMembers) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_ADD_MANAGER_TO_TEAM, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onFailed(int i) {
-                    result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_ADD_MANAGER_TO_TEAM, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_ADD_MANAGER_TO_TEAM, getJSONFromMap(result));
-                }
-            });
+            NIMClient.getService(TeamService.class).addManagers(teamId, userList).setCallback(
+                    new RequestCallbackTemplate<List<TeamMember>>("addManagersToTeam", funcId, JsConst.CALLBACK_ADD_MANAGER_TO_TEAM));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1782,6 +2065,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
@@ -1789,8 +2074,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             JSONArray users = new JSONArray(usersStr);
 
             if (TextUtils.isEmpty(teamId) || users == null || users.length() < 1) {
-                result.put("error", "teamId or users can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_REMOVE_MANAGER_FROM_TEAM, getJSONFromMap(result));
+                String msg = "teamId or users can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_REMOVE_MANAGER_FROM_TEAM, getJSONFromMap(result).toString());
+                }
                 return;
             }
 
@@ -1800,25 +2090,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 userList.add(users.getString(i));
             }
 
-            NIMClient.getService(TeamService.class).removeManagers(teamId, userList).setCallback(new RequestCallback<List<TeamMember>>() {
-                @Override
-                public void onSuccess(List<TeamMember> teamMembers) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_REMOVE_MANAGER_FROM_TEAM, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onFailed(int i) {
-                    result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_REMOVE_MANAGER_FROM_TEAM, getJSONFromMap(result));
-
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_REMOVE_MANAGER_FROM_TEAM, getJSONFromMap(result));
-                }
-            });
+            NIMClient.getService(TeamService.class).removeManagers(teamId, userList).setCallback(
+                    new RequestCallbackTemplate<List<TeamMember>>("removeManagersFromTeam", funcId,JsConst.CALLBACK_REMOVE_MANAGER_FROM_TEAM ));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1836,35 +2109,25 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             String newOwnerId = jsonObject.optString("newOwnerId");
             boolean isLeave = jsonObject.optBoolean("isLeave", false);
             if (TextUtils.isEmpty(teamId) || TextUtils.isEmpty(newOwnerId)) {
-                result.put("error", "teamId or newOwnerId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_TRANSFER_MANAGER_WITH_TEAM, getJSONFromMap(result));
+                String msg = "teamId or newOwnerId can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_TRANSFER_MANAGER_WITH_TEAM, getJSONFromMap(result).toString());
+                }
                 return;
             }
-            NIMClient.getService(TeamService.class).transferTeam(teamId, newOwnerId, isLeave).setCallback(new RequestCallback<List<TeamMember>>() {
-                @Override
-                public void onSuccess(List<TeamMember> teamMembers) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_TRANSFER_MANAGER_WITH_TEAM, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onFailed(int i) {
-                    result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_TRANSFER_MANAGER_WITH_TEAM, getJSONFromMap(result));
-
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_TRANSFER_MANAGER_WITH_TEAM, getJSONFromMap(result));
-                }
-            });
+            NIMClient.getService(TeamService.class).transferTeam(teamId, newOwnerId, isLeave).setCallback(
+                    new RequestCallbackTemplate<List<TeamMember>>("transferManagerWithTeam", funcId, JsConst.CALLBACK_TRANSFER_MANAGER_WITH_TEAM));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1883,38 +2146,34 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             if (TextUtils.isEmpty(teamId)) {
-                result.put("error", "teamId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_MEMBERS, getJSONFromMap(result));
+                String msg = "teamId can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_MEMBERS, getJSONFromMap(result).toString());
+                }
                 return;
             }
-            NIMClient.getService(TeamService.class).queryMemberList(teamId).setCallback(new RequestCallback<List<TeamMember>>() {
-                @Override
-                public void onSuccess(List<TeamMember> teamMembers) {
-                    List<TeamMemberVo> list = new ArrayList<TeamMemberVo>();
-                    for (TeamMember teamMember : teamMembers) {
-                        TeamMemberVo vo = DataUtil.trans2TeamMemberVo(teamMember);
-                        list.add(vo);
-                    }
-                    result.put("members", list);
-                    evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_MEMBERS, new Gson().toJson(result));
-                }
-
-                @Override
-                public void onFailed(int i) {
-                    result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_MEMBERS, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_MEMBERS, getJSONFromMap(result));
-                }
-            });
+            NIMClient.getService(TeamService.class).queryMemberList(teamId).setCallback(
+                    new RequestCallbackTemplate<List<TeamMember>>("fetchTeamMembers", funcId, JsConst.CALLBACK_FETCH_TEAM_MEMBERS, new CustomDataUtil<List<TeamMember>>() {
+                        @Override
+                        public String getDataStr(List<TeamMember> teamMembers) {
+                            List<TeamMemberVo> list = new ArrayList<TeamMemberVo>();
+                            for (TeamMember teamMember : teamMembers) {
+                                TeamMemberVo vo = DataUtil.trans2TeamMemberVo(teamMember);
+                                list.add(vo);
+                            }
+                            result.put("members", list);
+                            return new Gson().toJson(result);
+                        }
+                    }));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1932,32 +2191,22 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             if (TextUtils.isEmpty(teamId)) {
-                result.put("error", "teamId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_QUIT_TEAM, getJSONFromMap(result));
+                String msg = "teamId can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_QUIT_TEAM, getJSONFromMap(result).toString());
+                }
                 return;
             }
-            NIMClient.getService(TeamService.class).quitTeam(teamId).setCallback(new RequestCallback<Void>() {
-                @Override
-                public void onSuccess(Void aVoid) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_QUIT_TEAM, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onFailed(int i) {
-                    result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_QUIT_TEAM, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_QUIT_TEAM, getJSONFromMap(result));
-                }
-            });
+            NIMClient.getService(TeamService.class).quitTeam(teamId).setCallback(new RequestCallbackTemplate<Void>("quitTeam", funcId, JsConst.CALLBACK_QUIT_TEAM));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1975,6 +2224,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
@@ -1982,35 +2233,27 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             String usersStr = jsonObject.optString("users");
             JSONArray users = new JSONArray(usersStr);
             if (users == null || users.length() < 1) {
-                result.put("error", "users can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result));
+                String msg = "users can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_KICK_USERS, getJSONFromMap(result).toString());
+                }
                 return;
             }
 
             if (TextUtils.isEmpty(teamId)) {
+                String msg = "teamId can not be null";
                 result.put("error", "teamId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_KICK_USERS, getJSONFromMap(result));
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_KICK_USERS, getJSONFromMap(result).toString());
+                }
                 return;
             }
-
-            NIMClient.getService(TeamService.class).removeMember(teamId, users.getString(0)).setCallback(new RequestCallback<Void>() {
-                @Override
-                public void onSuccess(Void aVoid) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_KICK_USERS, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onFailed(int i) {
-                    result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_KICK_USERS, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_KICK_USERS, getJSONFromMap(result));
-                }
-            });
+            NIMClient.getService(TeamService.class).removeMember(teamId, users.getString(0)).setCallback(new RequestCallbackTemplate<Void>("kickUsers", funcId, JsConst.CALLBACK_KICK_USERS));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -2028,33 +2271,23 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             if (TextUtils.isEmpty(teamId)) {
-                result.put("error", "teamId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_DISMISS_TEAM, getJSONFromMap(result));
+                String msg = "teamId can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_DISMISS_TEAM, getJSONFromMap(result).toString());
+                }
                 return;
             }
-
-            NIMClient.getService(TeamService.class).dismissTeam(teamId).setCallback(new RequestCallback<Void>() {
-                @Override
-                public void onSuccess(Void aVoid) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_DISMISS_TEAM, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onFailed(int i) {
-                    result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_DISMISS_TEAM, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_DISMISS_TEAM, getJSONFromMap(result));
-                }
-            });
+            NIMClient.getService(TeamService.class).dismissTeam(teamId).setCallback(
+                    new RequestCallbackTemplate<Void>("dismissTeam", funcId, JsConst.CALLBACK_DISMISS_TEAM));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -2072,34 +2305,23 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             Boolean notify = jsonObject.optBoolean("notify", true);
             if (TextUtils.isEmpty(teamId)) {
-                result.put("error", "teamId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_TEAM, getJSONFromMap(result));
+                String msg = "teamId can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_TEAM, getJSONFromMap(result).toString());
+                }
                 return;
             }
-
-            NIMClient.getService(TeamService.class).muteTeam(teamId, notify).setCallback(new RequestCallback<Void>() {
-                @Override
-                public void onSuccess(Void aVoid) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_TEAM, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onFailed(int i) {
-                    result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_TEAM, getJSONFromMap(result));
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_TEAM, getJSONFromMap(result));
-                }
-            });
+            NIMClient.getService(TeamService.class).muteTeam(teamId, notify).setCallback(new RequestCallbackTemplate<Void>("updateNotifyStateForTeam", funcId, JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_TEAM));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -2117,6 +2339,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             JSONObject jsonObject = new JSONObject(json);
             int limit = jsonObject.optInt("limit", 10); //默认10条
@@ -2128,7 +2352,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 }
             }
             result.put("notifications", voList);
-            evaluateRootWindowScript(JsConst.CALLBACK_FETCH_SYSTEM_NOTIFICATION, new Gson().toJson(result));
+            if (funcId != -1) {
+                callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS,DataHelper.gson.toJsonTree(result));
+            } else {
+                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_SYSTEM_NOTIFICATION, new Gson().toJson(result));
+            }
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -2138,11 +2366,12 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      * 获取本地存储的内置系统未读数
      * @param params
      */
-    public void allNotificationsUnreadCount(String params[]) {
+    public int allNotificationsUnreadCount(String params[]) {
         int count = NIMClient.getService(SystemMessageService.class).querySystemMessageUnreadCountBlock();
         final HashMap<String, Object> result = new HashMap<String, Object>();
         result.put("count", count);
-        evaluateRootWindowScript(JsConst.CALLBACK_ALL_NOTIFICATION_UNREAD_COUNT, getJSONFromMap(result));
+        evaluateRootWindowScript(JsConst.CALLBACK_ALL_NOTIFICATION_UNREAD_COUNT, getJSONFromMap(result).toString());
+        return count;
     }
 
     /**
@@ -2157,16 +2386,18 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      * 标记本地存储的全部内置系统通知为已读
      * @param params
      */
-    public void markAllNotificationsAsRead(String params[]) {
+    public boolean markAllNotificationsAsRead(String params[]) {
         final HashMap<String, Object> result = new HashMap<String, Object>();
         try {
             NIMClient.getService(SystemMessageService.class).resetSystemMessageUnreadCount();
             result.put("result", true);
-            evaluateRootWindowScript(JsConst.CALLBACK_MARK_ALL_NOTIFICATIONS_AS_READ, getJSONFromMap(result));
+            evaluateRootWindowScript(JsConst.CALLBACK_MARK_ALL_NOTIFICATIONS_AS_READ, getJSONFromMap(result).toString());
+            return true;
         } catch (Exception e) {
             Log.i(TAG, e.getMessage());
             result.put("result", false);
-            evaluateRootWindowScript(JsConst.CALLBACK_MARK_ALL_NOTIFICATIONS_AS_READ, getJSONFromMap(result));
+            evaluateRootWindowScript(JsConst.CALLBACK_MARK_ALL_NOTIFICATIONS_AS_READ, getJSONFromMap(result).toString());
+            return false;
         }
     }
 
@@ -2174,10 +2405,10 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      *  发送自定义通知(客户端)
      * @param params
      */
-    public void sendCustomNotification(String params[]) {
+    public boolean sendCustomNotification(String params[]) {
         if (params == null || params.length < 1) {
             errorCallback(0, 0, "error params!");
-            return;
+            return false;
         }
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
@@ -2209,18 +2440,16 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             config.enableUnreadCount = shouldBeCounted;
             config.enablePushNick = apnsWithPrefix; //仅针对iOS
             command.setConfig(config);
-            //定义通知内容
-            JSONObject jsonContent = new JSONObject();
-            jsonContent.put("id", "2");
-            JSONObject data = new JSONObject();
-            data.put("body", content);
-            command.setContent(jsonContent.toString());
+
+            command.setContent(content);
             command.setApnsText(apnsContent);
             command.setSendToOnlineUserOnly(sendToOnlineUsersOnly);
             //发送通知
             NIMClient.getService(MsgService.class).sendCustomNotification(command);
+            return true;
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
+            return false;
         }
     }
 
@@ -2233,12 +2462,19 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             JSONObject jsonObject = new JSONObject(json);
             String userId = jsonObject.optString("userId");
             if (TextUtils.isEmpty(userId)) {
-                result.put("error", "userId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_USER_INFO, getJSONFromMap(result));
+                String msg = "userId can not be null";
+                result.put("error", msg);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_USER_INFO, getJSONFromMap(result).toString());
+                }
                 return;
             }
             NimUserInfo user = NIMClient.getService(UserService.class).getUserInfo(userId);
@@ -2252,7 +2488,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             result.put("isInMyBlackList", isInMyBlackList);
             UserInfoVo vo = DataUtil.trans2UserInfoVo(user);
             result.put("userInfo",vo);
-            evaluateRootWindowScript(JsConst.CALLBACK_USER_INFO, new Gson().toJson(result));
+            if (funcId != -1) {
+                callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, DataHelper.gson.toJsonTree(result));
+            } else {
+                evaluateRootWindowScript(JsConst.CALLBACK_USER_INFO, new Gson().toJson(result));
+            }
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -2269,21 +2509,29 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             JSONObject jsonObject = new JSONObject(json);
             String usersStr = jsonObject.optString("userIds");
             JSONArray users = new JSONArray(usersStr);
             if (users == null || users.length() < 1) {
-                result.put("error", "invalid params");
-                evaluateRootWindowScript(JsConst.CALLBACK_FETCH_USER_INFOS, getJSONFromMap(result));
+                result.put("error", MSG_INVALID_PARAMS);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, MSG_INVALID_PARAMS);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_FETCH_USER_INFOS, getJSONFromMap(result).toString());
+                }
                 return;
             }
             List<String> userIds = new ArrayList<String>();
             for (int i = 0; i < users.length(); i ++) {
                 userIds.add(users.getString(i));
             }
+
+
             NIMClient.getService(UserService.class).fetchUserInfo(userIds)
-                    .setCallback(new RequestCallbackTemplate<List<NimUserInfo>>("fetchUserInfos", JsConst.CALLBACK_FETCH_USER_INFOS, new CustomDataUtil<List<NimUserInfo>>() {
+                    .setCallback(new RequestCallbackTemplate<List<NimUserInfo>>("fetchUserInfos", funcId,JsConst.CALLBACK_FETCH_USER_INFOS, new CustomDataUtil<List<NimUserInfo>>() {
                         @Override
                         public String getDataStr(List<NimUserInfo> nimUserInfos) {
                             List<UserInfoVo> userInfoVoList = DataUtil.trans2UserInfoVoList(nimUserInfos);
@@ -2307,6 +2555,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             JSONObject jsonObject = new JSONObject(json);
             String nickName = jsonObject.optString("nickname");
@@ -2341,7 +2591,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 fields.put(UserInfoFieldEnum.EXTEND, ext);
             }
             NIMClient.getService(UserService.class).updateUserInfo(fields)
-                    .setCallback(new RequestCallbackTemplate<Void>("updateMyUserInfo", JsConst.CALLBACK_UPDATE_MY_USER_INFO));
+                    .setCallback(new RequestCallbackTemplate<Void>("updateMyUserInfo", funcId, JsConst.CALLBACK_UPDATE_MY_USER_INFO));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -2354,6 +2604,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      * @param params
      */
     public void myFriends(String params[]) {
+        boolean flag = params.length == 1 && BUtility.isNumeric(params[0]);
+        int funcId = flag ? Integer.parseInt(params[0]): -1 ;
         HashMap<String, Object> result = new HashMap<String, Object>();
         List<String> friendAccounts = NIMClient.getService(FriendService.class).getFriendAccounts();
         if (friendAccounts == null || friendAccounts.size() == 0) {
@@ -2363,7 +2615,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             List<UserInfoVo> userInfoVoList = DataUtil.trans2UserInfoVoList(userInfos);
             result.put("users", userInfoVoList);
         }
-        evaluateRootWindowScript(JsConst.CALLBACK_MY_FRIENDS, new Gson().toJson(result));
+        if (funcId != -1) {
+            callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, DataHelper.gson.toJsonTree(result));
+        } else {
+            evaluateRootWindowScript(JsConst.CALLBACK_MY_FRIENDS, new Gson().toJson(result));
+        }
 
     }
 
@@ -2379,6 +2635,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             JSONObject jsonObject = new JSONObject(json);
             String userId = jsonObject.optString("userId");
@@ -2388,13 +2646,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (operation == 1 || operation == 2) {
                 VerifyType verifyType = operation == 1 ? VerifyType.DIRECT_ADD : VerifyType.VERIFY_REQUEST;
                 NIMClient.getService(FriendService.class).addFriend(new AddFriendData(userId, verifyType, message))
-                        .setCallback(new RequestCallbackTemplate<Void>("requestFriend", JsConst.CALLback_REQUEST_FRIEND));
+                        .setCallback(new RequestCallbackTemplate<Void>("requestFriend", funcId, JsConst.CALLback_REQUEST_FRIEND));
                 return;
             }
             if (operation == 3 || operation == 4) {
                 boolean approve = operation == 3 ? true: false;
                 NIMClient.getService(FriendService.class).ackAddFriendRequest(userId, approve)
-                        .setCallback(new RequestCallbackTemplate<Void>("requestFriend", JsConst.CALLback_REQUEST_FRIEND));
+                        .setCallback(new RequestCallbackTemplate<Void>("requestFriend", funcId, JsConst.CALLback_REQUEST_FRIEND));
             }
         } catch (JSONException e) {
             Log.i(TAG, "[requestFriend]" + e.getMessage());
@@ -2412,10 +2670,12 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             JSONObject jsonObject = new JSONObject(json);
             String account = jsonObject.optString("userId");
-            NIMClient.getService(FriendService.class).deleteFriend(account).setCallback(new RequestCallbackTemplate<Void>("deleteFriend", JsConst.CALLback_DELETE_FRIEND));
+            NIMClient.getService(FriendService.class).deleteFriend(account).setCallback(new RequestCallbackTemplate<Void>("deleteFriend", funcId, JsConst.CALLback_DELETE_FRIEND));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -2426,6 +2686,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      * @param params
      */
     public void myBlackList(String params[]) {
+        boolean flag = params.length == 1 && BUtility.isNumeric(params[0]);
+        int funcId = flag ? Integer.parseInt(params[0]) : -1;
         List<String> accounts = NIMClient.getService(FriendService.class).getBlackList();
         final HashMap<String, Object> result = new HashMap<String, Object>();
         if (accounts != null && accounts.size() > 0) {
@@ -2435,7 +2697,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         } else {
             result.put("users", new Object[0]);
         }
-        evaluateRootWindowScript(JsConst.CALLBACK_MY_BLACK_LIST, new Gson().toJson(result));
+        if (funcId != -1) {
+            callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, DataHelper.gson.toJsonTree(result));
+        } else {
+            evaluateRootWindowScript(JsConst.CALLBACK_MY_BLACK_LIST, new Gson().toJson(result));
+        }
     }
 
     /**
@@ -2449,15 +2715,21 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             JSONObject jsonObject = new JSONObject(json);
             String account = jsonObject.optString("userId");
             if (TextUtils.isEmpty(account)) {
-                result.put("error", "invalid params");
-                evaluateRootWindowScript(JsConst.CALLback_ADD_TO_BLACK_LIST, getJSONFromMap(result));
+                result.put("error", MSG_INVALID_PARAMS);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_PARAMS);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLback_ADD_TO_BLACK_LIST, getJSONFromMap(result).toString());
+                }
                 return;
             }
-            NIMClient.getService(FriendService.class).addToBlackList(account).setCallback(new RequestCallbackTemplate<Void>("addToBlackList", JsConst.CALLback_ADD_TO_BLACK_LIST));
+            NIMClient.getService(FriendService.class).addToBlackList(account).setCallback(new RequestCallbackTemplate<Void>("addToBlackList", funcId, JsConst.CALLback_ADD_TO_BLACK_LIST));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -2474,16 +2746,22 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             JSONObject jsonObject = new JSONObject(json);
             String account = jsonObject.optString("userId");
             if (TextUtils.isEmpty(account)) {
-                result.put("error", "invalid params");
-                evaluateRootWindowScript(JsConst.CALLback_REMOVE_FROM_BLACK_LIST, getJSONFromMap(result));
+                result.put("error", MSG_INVALID_PARAMS);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_PARAMS);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLback_REMOVE_FROM_BLACK_LIST, getJSONFromMap(result).toString());
+                }
                 return;
             }
             NIMClient.getService(FriendService.class).removeFromBlackList(account).setCallback(
-                    new RequestCallbackTemplate<Void>("removeFromBlackBlackList", JsConst.CALLback_REMOVE_FROM_BLACK_LIST));
+                    new RequestCallbackTemplate<Void>("removeFromBlackBlackList", funcId, JsConst.CALLback_REMOVE_FROM_BLACK_LIST));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -2500,17 +2778,27 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             JSONObject jsonObject = new JSONObject(json);
             String account = jsonObject.optString("userId");
             if (TextUtils.isEmpty(account)) {
-                result.put("error", "invalid params");
-                evaluateRootWindowScript(JsConst.CALLback_IS_USER_IN_BLACK_LIST, getJSONFromMap(result));
+                result.put("error", MSG_INVALID_PARAMS);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_PARAMS);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLback_IS_USER_IN_BLACK_LIST, getJSONFromMap(result).toString());
+                }
                 return;
             }
             boolean isInBlackList = NIMClient.getService(FriendService.class).isInBlackList(account);
             result.put("result", isInBlackList);
-            evaluateRootWindowScript(JsConst.CALLback_IS_USER_IN_BLACK_LIST, getJSONFromMap(result));
+            if (funcId != -1) {
+                callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, isInBlackList);
+            } else {
+                evaluateRootWindowScript(JsConst.CALLback_IS_USER_IN_BLACK_LIST, getJSONFromMap(result).toString());
+            }
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -2521,6 +2809,9 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      * @param params
      */
     public void myMuteUserList(String params[]) {
+        boolean flag = params.length == 1 && BUtility.isNumeric(params[0]);
+        int funcId = flag ? Integer.parseInt(params[0]): -1;
+
         List<String> accountList = NIMClient.getService(FriendService.class).getMuteList();
         HashMap<String, Object> result = new HashMap<String, Object>();
         if (accountList != null && accountList.size() > 0) {
@@ -2530,7 +2821,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         } else {
             result.put("users", new Object[0]);
         }
-        evaluateRootWindowScript(JsConst.CALLBACK_MY_MUTE_USER_LIST, new Gson().toJson(result));
+        if (funcId != -1) {
+            callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, DataHelper.gson.toJsonTree(result));
+        } else {
+            evaluateRootWindowScript(JsConst.CALLBACK_MY_MUTE_USER_LIST, new Gson().toJson(result));
+        }
     }
 
     /**
@@ -2544,17 +2839,28 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
+
         try {
             JSONObject jsonObject = new JSONObject(json);
             String account = jsonObject.optString("userId");
             boolean notify = jsonObject.optBoolean("notify", true);
             if (TextUtils.isEmpty(account)) {
-                result.put("error", "invalid params");
-                evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_USER, getJSONFromMap(result));
+                result.put("error", MSG_INVALID_PARAMS);
+                if(funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_PARAMS);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_USER, getJSONFromMap(result).toString());
+                }
                 return;
             }
             NIMClient.getService(FriendService.class).setMessageNotify(account, notify);
-            evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_USER, "{}");
+            if (funcId != -1) {
+                callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
+            } else {
+                evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_USER, "{}");
+            }
         } catch (Exception e) {
             Log.i(TAG, e.getMessage());
         }
@@ -2571,22 +2877,31 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             JSONObject jsonObject = new JSONObject(json);
             String account = jsonObject.optString("userId");
             if (TextUtils.isEmpty(account)) {
-                result.put("error", "invalid params");
-                evaluateRootWindowScript(JsConst.CALLBACK_NOTIFY_FOR_NEW_MSG_FOR_USER, getJSONFromMap(result));
+                result.put("error", MSG_INVALID_PARAMS);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_PARAMS);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_NOTIFY_FOR_NEW_MSG_FOR_USER, getJSONFromMap(result).toString());
+                }
                 return;
             }
             boolean notice = NIMClient.getService(FriendService.class).isNeedMessageNotify(account);
             result.put("result", notice);
-            evaluateRootWindowScript(JsConst.CALLBACK_NOTIFY_FOR_NEW_MSG_FOR_USER, getJSONFromMap(result));
+            if (funcId != -1) {
+                callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, DataHelper.gson.toJsonTree(result));
+            } else {
+                evaluateRootWindowScript(JsConst.CALLBACK_NOTIFY_FOR_NEW_MSG_FOR_USER, getJSONFromMap(result).toString());
+            }
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
     }
-
 
 
     interface CustomDataUtil<T> {
@@ -2597,26 +2912,45 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         private String callBackFun;
         private String funName;
         private CustomDataUtil util;
+        private int funcId; // 4.0的function传入
 
-        public RequestCallbackTemplate (String funName, String callBackFun, CustomDataUtil util) {
+        public RequestCallbackTemplate (String funName, int funcId, String callBackFun, CustomDataUtil util) {
             this.funName = funName;
             this.callBackFun = callBackFun;
             this.util = util;
+            this.funcId = funcId;
         }
 
-        public RequestCallbackTemplate (String funName, String callBackFun) {
+        public RequestCallbackTemplate (String funName, int funcId, String callBackFun) {
             this.funName = funName;
             this.callBackFun = callBackFun;
+            this.funcId = funcId;
         }
         @Override
         public void onSuccess(T t) {
             if (t instanceof  Void) {
-                evaluateRootWindowScript(callBackFun, "{}");
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
+                } else {
+                    evaluateRootWindowScript(callBackFun, "{}");
+                }
             } else {
                 if (util == null) {
-                    evaluateRootWindowScript(callBackFun, "{}");
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
+                    } else {
+                        evaluateRootWindowScript(callBackFun, "{}");
+                    }
                 } else {
-                    evaluateRootWindowScript(callBackFun, util.getDataStr(t));
+                    if (funcId != -1) {
+                        try {
+                            callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, new JSONObject(util.getDataStr(t)));
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    } else {
+                        evaluateRootWindowScript(callBackFun, util.getDataStr(t));
+                    }
                 }
             }
         }
@@ -2626,7 +2960,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             Log.i(TAG, "[" + funName + "]fail code:" + code);
             HashMap<String, Object> result = new HashMap<String, Object>();
             result.put("error", code);
-            evaluateRootWindowScript(callBackFun, getJSONFromMap(result));
+            if (funcId != -1) {
+                callbackToJs(funcId, false, EUExCallback.F_C_FAILED);
+            } else {
+                evaluateRootWindowScript(callBackFun, getJSONFromMap(result).toString());
+            }
         }
 
         @Override
@@ -2634,7 +2972,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             Log.i(TAG, "[" + funName + "]" + throwable.getMessage());
             HashMap<String, Object> result = new HashMap<String, Object>();
             result.put("error", throwable.getMessage());
-            evaluateRootWindowScript(callBackFun, getJSONFromMap(result));
+            if (funcId != -1) {
+                callbackToJs(funcId, false, EUExCallback.F_C_FAILED);
+            } else {
+                evaluateRootWindowScript(callBackFun, getJSONFromMap(result).toString());
+            }
         }
     }
 
@@ -2647,6 +2989,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String roomId = jsonObject.optString("roomId");
@@ -2655,8 +2999,12 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             JSONObject extension = jsonObject.optJSONObject("extension"); //用户扩展字段
             JSONObject notifyExtension = jsonObject.optJSONObject("notifyExtension");//通知扩展字段
             if (TextUtils.isEmpty(roomId)) {
-                result.put("error", "roomId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_ENTER_CHATROOM, getJSONFromMap(result));
+                result.put("error", MSG_ROOM_ID_EMPTY);
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_EMPTY);
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_ENTER_CHATROOM, getJSONFromMap(result).toString());
+                }
                 return;
             }
             EnterChatRoomData data = new EnterChatRoomData(roomId);
@@ -2668,7 +3016,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (notifyExtension != null) {
                 data.setNotifyExtension(getMapFromJSON(notifyExtension));
             }
-            NIMClient.getService(ChatRoomService.class).enterChatRoom(data).setCallback(new RequestCallbackTemplate<Void>("enterChatRoom", JsConst.CALLBACK_ENTER_CHATROOM));
+            NIMClient.getService(ChatRoomService.class).enterChatRoom(data).setCallback(
+                    new RequestCallbackTemplate<Void>("enterChatRoom", funcId, JsConst.CALLBACK_ENTER_CHATROOM));
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -2682,12 +3031,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+
         try {
             jsonObject = new JSONObject(json);
             String roomId = jsonObject.optString("roomId");
             if (TextUtils.isEmpty(roomId)) {
-                result.put("error", "roomId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_EXIT_CHATROOM, getJSONFromMap(result));
+                result.put("error", MSG_ROOM_ID_EMPTY);
+                evaluateRootWindowScript(JsConst.CALLBACK_EXIT_CHATROOM, getJSONFromMap(result).toString());
                 return;
             }
             NIMClient.getService(ChatRoomService.class).exitChatRoom(roomId);
@@ -2706,13 +3056,19 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String roomId = null;
         long startTime = 0;
         int limit = 10;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
             startTime = jsonObject.optLong("startTime", 0);
             limit = jsonObject.optInt("limit", 10);
             if (TextUtils.isEmpty(roomId)) {
-                Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_EMPTY);
+                } else {
+                    Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                }
                 return;
             }
         } catch (JSONException e) {
@@ -2722,7 +3078,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
 
         NIMClient.getService(ChatRoomService.class).pullMessageHistory(roomId, startTime, limit)
-                .setCallback(new RequestCallbackTemplate<List<ChatRoomMessage>>("getChatRoomHistoryMsg", JsConst.CALLBACK_GET_CHATROOM_HISTORY_MSG, new CustomDataUtil<List<ChatRoomMessage>>() {
+                .setCallback(new RequestCallbackTemplate<List<ChatRoomMessage>>("getChatRoomHistoryMsg", funcId, JsConst.CALLBACK_GET_CHATROOM_HISTORY_MSG, new CustomDataUtil<List<ChatRoomMessage>>() {
                     @Override
                     public String getDataStr(List<ChatRoomMessage> messages) {
                         if (messages != null) {
@@ -2753,11 +3109,18 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         JSONObject jsonObject;
         String roomId = null;
 
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
+
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
             if (TextUtils.isEmpty(roomId)) {
-                Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_EMPTY);
+                } else {
+                    Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                }
                 return;
             }
         } catch (JSONException e) {
@@ -2766,7 +3129,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             return;
         }
         NIMClient.getService(ChatRoomService.class)
-                .fetchRoomInfo(roomId).setCallback(new RequestCallbackTemplate<ChatRoomInfo>("getChatRoomInfo", JsConst.CALLBACK_GET_CHATROOM_INFO, new CustomDataUtil<ChatRoomInfo>() {
+                .fetchRoomInfo(roomId).setCallback(new RequestCallbackTemplate<ChatRoomInfo>("getChatRoomInfo", funcId, JsConst.CALLBACK_GET_CHATROOM_INFO, new CustomDataUtil<ChatRoomInfo>() {
             @Override
             public String getDataStr(ChatRoomInfo chatRoomInfo) {
                 HashMap<String, Object> result = new HashMap<String, Object>();
@@ -2790,11 +3153,19 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         long time = 0;
         int limit = 10;
 
+
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
+
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
             if (TextUtils.isEmpty(roomId)) {
-                Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_EMPTY);
+                } else {
+                    Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                }
                 return;
             }
             type = jsonObject.optInt("type", 0);
@@ -2809,7 +3180,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         NIMClient.getService(ChatRoomService.class)
                 .fetchRoomMembers(roomId, MemberQueryType.typeOfValue(type), time, limit)
-                .setCallback(new RequestCallbackTemplate<List<ChatRoomMember>>("getChatRoomMembers", JsConst.CALLBACK_GET_CHATROOM_MEMBERS, new CustomDataUtil<List<ChatRoomMember>>() {
+                .setCallback(new RequestCallbackTemplate<List<ChatRoomMember>>("getChatRoomMembers", funcId, JsConst.CALLBACK_GET_CHATROOM_MEMBERS, new CustomDataUtil<List<ChatRoomMember>>() {
                     @Override
                     public String getDataStr(List<ChatRoomMember> chatRoomMembers) {
                         List<ChatRoomMemberVo> list = DataUtil.trans2ChatRoomMembers(chatRoomMembers);
@@ -2831,6 +3202,9 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String roomId = null;
         JSONArray ids = null;
         List<String> accountList = new ArrayList<String>();
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
+
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
@@ -2839,11 +3213,19 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             ids = new JSONArray(usersStr);
 
             if (TextUtils.isEmpty(roomId)) {
-                Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_EMPTY);
+                } else {
+                    Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                }
                 return;
             }
             if (ids == null) {
-                Toast.makeText(mContext, "user id list is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "user id list is empty !");
+                } else {
+                    Toast.makeText(mContext, "user id list is empty !", Toast.LENGTH_SHORT).show();
+                }
                 return;
             }
             for (int i = 0; i < ids.length(); i++) {
@@ -2855,7 +3237,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
 
          NIMClient.getService(ChatRoomService.class)
-                .fetchRoomMembersByIds(roomId, accountList).setCallback(new RequestCallbackTemplate<List<ChatRoomMember>>("getChatRoomMembersByIds",
+                .fetchRoomMembersByIds(roomId, accountList).setCallback(new RequestCallbackTemplate<List<ChatRoomMember>>("getChatRoomMembersByIds", funcId,
                  JsConst.CALLBACK_GET_CHATROOM_MEMBERS_BY_IDS, new CustomDataUtil<List<ChatRoomMember>>() {
              @Override
              public String getDataStr(List<ChatRoomMember> chatRoomMembers) {
@@ -2888,7 +3270,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             status = 3;
         }
         result.put("status", status);
-        evaluateRootWindowScript(JsConst.ON_CHATROOM_STATUS_CHANGE, getJSONFromMap(result));
+        evaluateRootWindowScript(JsConst.ON_CHATROOM_STATUS_CHANGE, getJSONFromMap(result).toString().toString());
     }
 
     public void addUserToBlackList(String [] params) {
@@ -2901,6 +3283,10 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String roomId;
         String account;
         boolean isAdd;
+
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
+
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
@@ -2908,7 +3294,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             isAdd = jsonObject.optBoolean("isAdd", true);
 
             if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
-                Toast.makeText(mContext, "roomId or account is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "roomId or account is empty !");
+                } else {
+                    Toast.makeText(mContext, "roomId or account is empty !", Toast.LENGTH_SHORT).show();
+                }
                 return;
             }
         } catch (JSONException e) {
@@ -2919,7 +3309,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         MemberOption option = new MemberOption(roomId, account);
         NIMClient.getService(ChatRoomService.class)
                 .markChatRoomBlackList(isAdd, option)
-                .setCallback(new RequestCallbackTemplate<ChatRoomMember>("addUserToBlackList", JsConst.CALLBACK_ADD_USER_TO_BLACK_LIST));
+                .setCallback(new RequestCallbackTemplate<ChatRoomMember>("addUserToBlackList", funcId, JsConst.CALLBACK_ADD_USER_TO_BLACK_LIST));
     }
 
     public void muteUser(String [] params) {
@@ -2932,6 +3322,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String roomId;
         String account;
         boolean isMute;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
@@ -2939,7 +3331,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             isMute = jsonObject.optBoolean("isMute", true);
 
             if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
-                Toast.makeText(mContext, "roomId or account is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_OR_USER_ID_EMPTY);
+                } else {
+                    Toast.makeText(mContext, MSG_ROOM_ID_OR_USER_ID_EMPTY, Toast.LENGTH_SHORT).show();
+                }
                 return;
             }
         } catch (JSONException e) {
@@ -2950,7 +3346,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         MemberOption option = new MemberOption(roomId, account);
         NIMClient.getService(ChatRoomService.class)
                 .markChatRoomMutedList(isMute, option)
-                .setCallback(new RequestCallbackTemplate<ChatRoomMember>("muteUser", JsConst.CALLBACK_MUTE_USER));
+                .setCallback(new RequestCallbackTemplate<ChatRoomMember>("muteUser", funcId, JsConst.CALLBACK_MUTE_USER));
     }
 
     public void setAdmin(String [] params) {
@@ -2963,6 +3359,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String roomId;
         String account;
         boolean isAdmin;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
@@ -2970,7 +3368,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             isAdmin = jsonObject.optBoolean("isAdmin", true);
 
             if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
-                Toast.makeText(mContext, "roomId or account is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_OR_USER_ID_EMPTY);
+                } else {
+                    Toast.makeText(mContext, MSG_ROOM_ID_OR_USER_ID_EMPTY, Toast.LENGTH_SHORT).show();
+                }
                 return;
             }
         } catch (JSONException e) {
@@ -2981,7 +3383,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         MemberOption option = new MemberOption(roomId, account);
         NIMClient.getService(ChatRoomService.class)
                 .markChatRoomManager(isAdmin, option)
-                .setCallback(new RequestCallbackTemplate<ChatRoomMember>("setAdmin", JsConst.CALLBACK_SET_ADMIN));
+                .setCallback(new RequestCallbackTemplate<ChatRoomMember>("setAdmin", funcId, JsConst.CALLBACK_SET_ADMIN));
     }
 
     public void setNormal(String [] params) {
@@ -2994,6 +3396,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String roomId;
         String account;
         boolean isNormal;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
@@ -3001,7 +3405,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             isNormal = jsonObject.optBoolean("isNormal", true);
 
             if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
-                Toast.makeText(mContext, "roomId or account is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_OR_USER_ID_EMPTY);
+                } else {
+                    Toast.makeText(mContext, MSG_ROOM_ID_OR_USER_ID_EMPTY, Toast.LENGTH_SHORT).show();
+                }
                 return;
             }
         } catch (JSONException e) {
@@ -3012,7 +3420,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         MemberOption option = new MemberOption(roomId, account);
         NIMClient.getService(ChatRoomService.class)
                 .markNormalMember(isNormal, option)
-                .setCallback(new RequestCallbackTemplate<ChatRoomMember>("setNormal", JsConst.CALLBACK_SET_NORMAL));
+                .setCallback(new RequestCallbackTemplate<ChatRoomMember>("setNormal", funcId, JsConst.CALLBACK_SET_NORMAL));
     }
     //踢出聊天室
     public void kickMemberFromChatRoom(String [] params) {
@@ -3025,6 +3433,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String roomId;
         String account;
         String reason;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
@@ -3032,7 +3442,11 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             reason = jsonObject.optString("reason");
 
             if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
-                Toast.makeText(mContext, "roomId or account is empty !", Toast.LENGTH_SHORT).show();
+                if (funcId != -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_OR_USER_ID_EMPTY);
+                } else {
+                    Toast.makeText(mContext, MSG_ROOM_ID_OR_USER_ID_EMPTY, Toast.LENGTH_SHORT).show();
+                }
                 return;
             }
         } catch (JSONException e) {
@@ -3044,7 +3458,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         reasonMap.put("reason", reason);
         NIMClient.getService(ChatRoomService.class)
                 .kickMember(roomId, account, reasonMap)
-                .setCallback(new RequestCallbackTemplate<Void>("kickMemberFromChatRoom", JsConst.CALLBACK_KICK_MEMBER_FROM_CHAT_ROOM));
+                .setCallback(new RequestCallbackTemplate<Void>("kickMemberFromChatRoom", funcId, JsConst.CALLBACK_KICK_MEMBER_FROM_CHAT_ROOM));
     }
 
     @Override
@@ -3052,7 +3466,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         Map<String, Object> result = new HashMap<String, Object>();
         result.put("roomId", chatRoomKickOutEvent.getRoomId());
         result.put("code", chatRoomKickOutEvent.getReason().getValue());
-        evaluateRootWindowScript(JsConst.ON_CHAT_ROOM_KICK_OUT_EVENT, getJSONFromMap(result));
+        evaluateRootWindowScript(JsConst.ON_CHAT_ROOM_KICK_OUT_EVENT, getJSONFromMap(result).toString().toString());
     }
 
     public String getRealPath(String path){
@@ -3087,7 +3501,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (realPath.startsWith("/data")){
                 CommonUtil.copyFile(new File(realPath), destFile);
                 return destFile.getAbsolutePath();
-            }else if( CommonUtil.saveFileFromAssetsToSystem(mContext, realPath, destFile)) {
+            } else if( CommonUtil.saveFileFromAssetsToSystem(mContext, realPath, destFile)) {
                 return destFile.getAbsolutePath();
             } else {
                 Log.i(TAG, "[getRealPath error]");
@@ -3099,7 +3513,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
     }
 
 
-    private String getJSONFromMap(Map<String, Object> result) {
+    private JSONObject getJSONFromMap(Map<String, Object> result) {
         if (result == null) {
             return null;
         }
@@ -3113,7 +3527,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         } catch (JSONException e) {
             e.printStackTrace();
         }
-        return jsonObject.toString();
+        return jsonObject;
     }
 
     private Map<String, Object> getMapFromJSON(JSONObject jsonObject) throws JSONException{
@@ -3196,6 +3610,9 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String js = SCRIPT_HEADER + "if(" + methodName + "){"
                 + methodName + "('" + jsonData + "');}";
         evaluateScript("root", 0, js);
+//        if (methodName.startsWith("uexNIM.cb")) {
+//            rootEBrowserView.loadUrl(js);
+//        }
     }
 
     @Override
@@ -3209,7 +3626,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      */
     @Override
     public void onSendMessageWithProgress(Map<String, Object> result) {
-       evaluateRootWindowScript(JsConst.ON_SEND_MESSAGE_WITH_PROGRESS, getJSONFromMap(result));
+       evaluateRootWindowScript(JsConst.ON_SEND_MESSAGE_WITH_PROGRESS, getJSONFromMap(result).toString());
     }
 
     @Override
@@ -3277,6 +3694,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         HashMap<String, Object> result = new HashMap<String, Object>();
         CustomNotificationVo vo = DataUtil.trans2CustomNotificationVo(customNotification);
         result.put("notification", vo);
+        System.out.println("-------->" + DataHelper.gson.toJson(result));
         evaluateRootWindowScript(JsConst.ON_RECIEVED_CUSTOM_SYSTEM_NOTIFICATION, new Gson().toJson(result));
     }
 
@@ -3300,5 +3718,10 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         HashMap<String, Object> result = new HashMap<String, Object>();
         Log.i(TAG, "[Receive Msg]" + new Gson().toJson(list));
         evaluateRootWindowScript(JsConst.ON_RECIEVED_MESSAGE, new Gson().toJson(list));
+    }
+
+    @Override
+    public void onBlackListChanged(BlackListChangedNotify blackListChangedNotify) {
+        evaluateRootWindowScript(JsConst.ON_BLACK_LIST_CHANGED, null);
     }
 }
