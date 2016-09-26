@@ -586,7 +586,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 if (funcId != -1) {
-                    result.put("error", MSG_INVALID_SESSION_TYPE)
+                    result.put("error", MSG_INVALID_SESSION_TYPE);
                     callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
