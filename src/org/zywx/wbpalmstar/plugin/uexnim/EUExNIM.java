@@ -255,7 +255,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 String msg = "userId or password is empty !";
                 result.put("error", msg);
                 if (loginCallbackId != -1) {
-                    callbackToJs(loginCallbackId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(loginCallbackId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_LOGIN, getJSONFromMap(result).toString());
                 }
@@ -371,7 +371,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             result.put("result", false);
             result.put("error", e.toString());
             if (logoutCallbackId != -1) {
-                callbackToJs(logoutCallbackId ,false, EUExCallback.F_C_FAILED, e.toString());
+                callbackToJs(logoutCallbackId ,false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
             } else {
                 evaluateRootWindowScript(JsConst.CALLBACK_LOGOUT, getJSONFromMap(result).toString());
             }
@@ -400,15 +400,18 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             sessionId = jsonObject.optString("sessionId");
             sessionType = jsonObject.optInt("sessionType");
             content = jsonObject.optString("content");
+            HashMap<String, Object> result = new HashMap<String, Object>();
             if (TextUtils.isEmpty(sessionId)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "sessionId is empty !");
+                    result.put("error", "sessionId is empty !");
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_SESSION_TYPE);
+                    result.put("error", MSG_INVALID_SESSION_TYPE);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
@@ -465,6 +468,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         Map<String, Object> ext;
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
+        HashMap<String, Object> result = new HashMap<String, Object>();
+
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -473,13 +478,15 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             displayName = jsonObject.optString("displayName");
             if (TextUtils.isEmpty(sessionId) || TextUtils.isEmpty(filePath)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_EMPTY_SESSION_ID_FILE_PATH);
+                    result.put("error", MSG_EMPTY_SESSION_ID_FILE_PATH);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_SESSION_TYPE);
+                    result.put("error", MSG_INVALID_SESSION_TYPE);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
@@ -561,6 +568,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         Map<String, Object> ext;
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
+        HashMap<String, Object> result = new HashMap<String, Object>();
+
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -570,13 +579,15 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             title = jsonObject.optString("title");
             if (TextUtils.isEmpty(sessionId)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "sessionId is empty !");
+                    result.put("error", "sessionId is empty !");
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_SESSION_TYPE);
+                    result.put("error", MSG_INVALID_SESSION_TYPE)
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
@@ -631,6 +642,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         Map<String, Object> ext;
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
+        HashMap<String, Object> result = new HashMap<String, Object>();
+
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -638,13 +651,15 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             filePath = jsonObject.optString("filePath");
             if (TextUtils.isEmpty(sessionId) || TextUtils.isEmpty(filePath)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_EMPTY_SESSION_ID_FILE_PATH);
+                    result.put("error", MSG_EMPTY_SESSION_ID_FILE_PATH);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_SESSION_TYPE);
+                    result.put("error", MSG_INVALID_SESSION_TYPE);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
@@ -699,6 +714,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         Map<String, Object> ext;
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
+        HashMap<String, Object> result = new HashMap<String, Object>();
+
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -707,13 +724,15 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             displayName = jsonObject.optString("displayName");
             if (TextUtils.isEmpty(sessionId) || TextUtils.isEmpty(filePath)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_EMPTY_SESSION_ID_FILE_PATH);
+                    result.put("error", MSG_EMPTY_SESSION_ID_FILE_PATH);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_SESSION_TYPE);
+                    result.put("error", MSG_INVALID_SESSION_TYPE);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
@@ -773,6 +792,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         Map<String, Object> ext;
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
+        HashMap<String, Object> result = new HashMap<String, Object>();
+
         try {
             jsonObject = new JSONObject(json);
             sessionId = jsonObject.optString("sessionId");
@@ -781,13 +802,15 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             displayName = jsonObject.optString("displayName");
             if (TextUtils.isEmpty(sessionId) || TextUtils.isEmpty(filePath)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_EMPTY_SESSION_ID_FILE_PATH);
+                    result.put("error", MSG_EMPTY_SESSION_ID_FILE_PATH );
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_SESSION_TYPE);
+                    result.put("error", MSG_INVALID_SESSION_TYPE);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
@@ -838,7 +861,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     String msg = "无最近会话消息";
                     map.put(NIMConstant.TEXT_ERROR, msg);
                     if (funcCallbackId != -1) {
-                        callbackToJs(funcCallbackId, false, EUExCallback.F_C_FAILED, msg);
+                        callbackToJs(funcCallbackId, false, EUExCallback.F_C_FAILED, getJSONFromMap(map));
                     } else {
                         evaluateRootWindowScript(JsConst.CALLBACK_ALL_RECENT_SESSION, getJSONFromMap(map).toString());
                     }
@@ -957,7 +980,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 HashMap<String, Object> result = new HashMap<String, Object>();
                 result.put("error", code);
                 if (callbackId != -1) {
-                    callbackToJs(callbackId, false, EUExCallback.F_C_FAILED, code);
+                    callbackToJs(callbackId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_FETCH_MESSAGE_HISTORY, getJSONFromMap(result).toString());
                 }
@@ -969,7 +992,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 HashMap<String, Object> result = new HashMap<String, Object>();
                 result.put("error", throwable.getMessage());
                 if (callbackId != -1) {
-                    callbackToJs(callbackId, false, EUExCallback.F_C_FAILED, throwable.getMessage());
+                    callbackToJs(callbackId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_FETCH_MESSAGE_HISTORY, getJSONFromMap(result).toString());
                 }
@@ -1295,7 +1318,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 HashMap<String, Object> result = new HashMap<String, Object>();
                 result.put("error", i);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, i);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_ALL_MY_TEAMS, getJSONFromMap(result).toString());
                 }
@@ -1308,7 +1331,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 HashMap<String, Object> result = new HashMap<String, Object>();
                 result.put("error", throwable.getMessage());
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, throwable.getMessage());
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_ALL_MY_TEAMS, getJSONFromMap(result).toString());
                 }
@@ -1517,24 +1540,24 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 @Override
                 public void onFailed(int i) {
                     //高级群不能直接拉人，发出邀请成功会返回810，此处应该认为邀请已发出
+                    result.put("error", i);
                     if (funcId != -1) {
                         if (i == 810) {
                             callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
                         } else {
-                            callbackToJs(funcId, false, EUExCallback.F_C_FAILED, i);
+                            callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                         }
                     } else {
-                        result.put("error", i);
                         evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result).toString());
                     }
                 }
 
                 @Override
                 public void onException(Throwable throwable) {
+                    result.put("error", throwable.getMessage());
                     if (funcId != -1) {
-                        callbackToJs(funcId, false, EUExCallback.F_C_FAILED);
+                        callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                     } else {
-                        result.put("error", throwable.getMessage());
                         evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result).toString());
                     }
                 }
@@ -1556,35 +1579,21 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         final HashMap<String, Object> result = new HashMap<String, Object>();
         String json = params[0];
         JSONObject jsonObject;
+        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
+        final int funcId = flag ? Integer.parseInt(params[1]) : -1;
         try {
             jsonObject = new JSONObject(json);
             String teamId = jsonObject.optString("teamId");
             String inviterId = jsonObject.optString("invitorId"); //invitorId--文档的拼写错误
             if (TextUtils.isEmpty(teamId) || TextUtils.isEmpty(inviterId)) {
                 result.put("error", "teamId or invitorId can not be null");
-                evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result).toString());
+                if (funcId == -1) {
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
+                } else {
+                    evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result).toString());
+                }
                 return;
             }
-            NIMClient.getService(TeamService.class).acceptInvite(teamId, inviterId).setCallback(new RequestCallback<Void>() {
-                @Override
-                public void onSuccess(Void aVoid) {
-                    evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result).toString());
-                }
-
-                @Override
-                public void onFailed(int i) {
-                    result.put("error", i);
-                    evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result).toString());
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    result.put("error", throwable.getMessage());
-                    evaluateRootWindowScript(JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM, getJSONFromMap(result).toString());
-                }
-            });
-            boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
-            final int funcId = flag ? Integer.parseInt(params[1]) : -1;
             NIMClient.getService(TeamService.class).acceptInvite(teamId, inviterId).setCallback(
                     new RequestCallbackTemplate<Void>("acceptInviteWithTeam", funcId, JsConst.CALLBACK_ACCEPT_INVITE_WITH_TEAM));
         } catch (JSONException e) {
@@ -1616,7 +1625,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 String msg = "teamId or invitorId can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_REJECT_INVITE_WITH_TEAM, getJSONFromMap(result).toString());
                 }
@@ -1651,7 +1660,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (TextUtils.isEmpty(teamId)) {
                 result.put("error", MSG_TEAM_ID_EMPTY);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_TEAM_ID_EMPTY);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_APPLY_JOIN_TEAM, getJSONFromMap(result).toString());
                 }
@@ -1676,8 +1685,9 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     } else {
                         result.put("error", code);
                     }
+                    result.put("code", code);
                     if (funcId != -1) {
-                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, result);
+                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, getJSONFromMap(result));
                     } else {
                         evaluateRootWindowScript(JsConst.CALLBACK_APPLY_JOIN_TEAM, getJSONFromMap(result).toString());
                     }
@@ -1687,7 +1697,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 public void onException(Throwable throwable) {
                     result.put("error", throwable.getMessage());
                     if (funcId != -1) {
-                        callbackToJs(funcId, false, EUExCallback.F_C_FAILED, throwable.getMessage());
+                        callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                     } else {
                         evaluateRootWindowScript(JsConst.CALLBACK_APPLY_JOIN_TEAM, getJSONFromMap(result).toString());
                     }
@@ -1717,10 +1727,10 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             String teamId = jsonObject.optString("teamId");
             String userId = jsonObject.optString("userId");
             if (TextUtils.isEmpty(teamId) || TextUtils.isEmpty(userId)) {
+                result.put("error", "teamId or userId can not be null");
                 if(funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "teamId or userId can not be null");
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
-                    result.put("error", "teamId or userId can not be null");
                     evaluateRootWindowScript(JsConst.CALLBACK_PASS_APPLY_JOIN_TO_TEAM, getJSONFromMap(result).toString());
                 }
                 return;
@@ -1743,7 +1753,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                         result.put("error", code);
                     }
                     if (funcId != -1) {
-                        callbackToJs(funcId, false, EUExCallback.F_C_FAILED, result);
+                        callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                         return;
                     }
                     evaluateRootWindowScript(JsConst.CALLBACK_PASS_APPLY_JOIN_TO_TEAM, getJSONFromMap(result).toString());
@@ -1780,10 +1790,10 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             String userId = jsonObject.optString("userId");
             String rejectReason = jsonObject.optString("rejectReason", "");
             if (TextUtils.isEmpty(teamId) || TextUtils.isEmpty(userId)) {
+                result.put("error", "teamId or userId can not be null");
                 if(funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "teamId or userId can not be null");
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED,  getJSONFromMap(result));
                 } else {
-                    result.put("error", "teamId or userId can not be null");
                     evaluateRootWindowScript(JsConst.CALLBACK_REJECT_APPLY_JOIN_TO_TEAM, getJSONFromMap(result).toString());
                 }
                 return;
@@ -1815,6 +1825,10 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 @Override
                 public void onException(Throwable throwable) {
                     result.put("error", throwable.getMessage());
+                    if (funcId != -1) {
+                        callbackToJs(funcId, false, EUExCallback.F_C_FAILED, DataHelper.gson.toJsonTree(result));
+                        return;
+                    }
                     evaluateRootWindowScript(JsConst.CALLBACK_REJECT_APPLY_JOIN_TO_TEAM, getJSONFromMap(result).toString());
                 }
             });
@@ -1935,7 +1949,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 msg = "teamId or teamName can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "teamId or teamName can not be null");
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(callbackFunTemp, getJSONFromMap(result).toString());
                 }
@@ -1947,7 +1961,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 msg = "teamId or intro can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "teamId or teamName can not be null");
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(callbackFunTemp, getJSONFromMap(result).toString());
                 }
@@ -1959,7 +1973,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 msg = "teamId or announcement can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(callbackFunTemp, getJSONFromMap(result).toString());
                 }
@@ -1971,7 +1985,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 msg = "teamId or joinMode can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(callbackFunTemp, getJSONFromMap(result).toString());
                 }
@@ -1988,24 +2002,6 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
 
         final String callbackFun = callbackFunTemp;
-        NIMClient.getService(TeamService.class).updateTeam(teamId, fieldType, value).setCallback(new RequestCallback<Void>() {
-            @Override
-            public void onSuccess(Void aVoid) {
-                evaluateRootWindowScript(callbackFun, getJSONFromMap(result).toString());
-            }
-
-            @Override
-            public void onFailed(int i) {
-                result.put("error", i);
-                evaluateRootWindowScript(callbackFun, getJSONFromMap(result).toString());
-            }
-
-            @Override
-            public void onException(Throwable throwable) {
-                result.put("error", throwable.getMessage());
-                evaluateRootWindowScript(callbackFun, getJSONFromMap(result).toString());
-            }
-        });
         NIMClient.getService(TeamService.class).updateTeam(teamId, fieldType, value).setCallback(
                 new RequestCallbackTemplate<Void>("updateTeamInfo", funcId, callbackFun));
     }
@@ -2034,7 +2030,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 String msg = "teamId or users can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_ADD_MANAGER_TO_TEAM, getJSONFromMap(result).toString());
                 }
@@ -2077,7 +2073,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 String msg = "teamId or users can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_REMOVE_MANAGER_FROM_TEAM, getJSONFromMap(result).toString());
                 }
@@ -2120,7 +2116,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 String msg = "teamId or newOwnerId can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_TRANSFER_MANAGER_WITH_TEAM, getJSONFromMap(result).toString());
                 }
@@ -2155,7 +2151,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 String msg = "teamId can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_FETCH_TEAM_MEMBERS, getJSONFromMap(result).toString());
                 }
@@ -2200,7 +2196,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 String msg = "teamId can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_QUIT_TEAM, getJSONFromMap(result).toString());
                 }
@@ -2236,7 +2232,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 String msg = "users can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_KICK_USERS, getJSONFromMap(result).toString());
                 }
@@ -2247,7 +2243,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 String msg = "teamId can not be null";
                 result.put("error", "teamId can not be null");
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_KICK_USERS, getJSONFromMap(result).toString());
                 }
@@ -2280,7 +2276,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 String msg = "teamId can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_DISMISS_TEAM, getJSONFromMap(result).toString());
                 }
@@ -2315,7 +2311,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 String msg = "teamId can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_TEAM, getJSONFromMap(result).toString());
                 }
@@ -2353,7 +2349,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             }
             result.put("notifications", voList);
             if (funcId != -1) {
-                callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS,DataHelper.gson.toJsonTree(result));
+                callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, DataHelper.gson.toJsonTree(result));
             } else {
                 evaluateRootWindowScript(JsConst.CALLBACK_FETCH_SYSTEM_NOTIFICATION, new Gson().toJson(result));
             }
@@ -2471,7 +2467,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 String msg = "userId can not be null";
                 result.put("error", msg);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, msg);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_USER_INFO, getJSONFromMap(result).toString());
                 }
@@ -2518,7 +2514,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (users == null || users.length() < 1) {
                 result.put("error", MSG_INVALID_PARAMS);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, MSG_INVALID_PARAMS);
+                    callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_FETCH_USER_INFOS, getJSONFromMap(result).toString());
                 }
@@ -2723,7 +2719,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (TextUtils.isEmpty(account)) {
                 result.put("error", MSG_INVALID_PARAMS);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_PARAMS);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLback_ADD_TO_BLACK_LIST, getJSONFromMap(result).toString());
                 }
@@ -2754,7 +2750,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (TextUtils.isEmpty(account)) {
                 result.put("error", MSG_INVALID_PARAMS);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_PARAMS);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLback_REMOVE_FROM_BLACK_LIST, getJSONFromMap(result).toString());
                 }
@@ -2786,7 +2782,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (TextUtils.isEmpty(account)) {
                 result.put("error", MSG_INVALID_PARAMS);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_PARAMS);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLback_IS_USER_IN_BLACK_LIST, getJSONFromMap(result).toString());
                 }
@@ -2849,7 +2845,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (TextUtils.isEmpty(account)) {
                 result.put("error", MSG_INVALID_PARAMS);
                 if(funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_PARAMS);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_UPDATE_NOTIFY_STATE_FOR_USER, getJSONFromMap(result).toString());
                 }
@@ -2883,9 +2879,9 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             JSONObject jsonObject = new JSONObject(json);
             String account = jsonObject.optString("userId");
             if (TextUtils.isEmpty(account)) {
-                result.put("error", MSG_INVALID_PARAMS);
+                result.put("error",  MSG_INVALID_PARAMS);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_INVALID_PARAMS);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_NOTIFY_FOR_NEW_MSG_FOR_USER, getJSONFromMap(result).toString());
                 }
@@ -2894,7 +2890,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             boolean notice = NIMClient.getService(FriendService.class).isNeedMessageNotify(account);
             result.put("result", notice);
             if (funcId != -1) {
-                callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, DataHelper.gson.toJsonTree(result));
+                callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, notice);
             } else {
                 evaluateRootWindowScript(JsConst.CALLBACK_NOTIFY_FOR_NEW_MSG_FOR_USER, getJSONFromMap(result).toString());
             }
@@ -2961,7 +2957,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             HashMap<String, Object> result = new HashMap<String, Object>();
             result.put("error", code);
             if (funcId != -1) {
-                callbackToJs(funcId, false, EUExCallback.F_C_FAILED);
+                callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
             } else {
                 evaluateRootWindowScript(callBackFun, getJSONFromMap(result).toString());
             }
@@ -2973,7 +2969,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             HashMap<String, Object> result = new HashMap<String, Object>();
             result.put("error", throwable.getMessage());
             if (funcId != -1) {
-                callbackToJs(funcId, false, EUExCallback.F_C_FAILED);
+                callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
             } else {
                 evaluateRootWindowScript(callBackFun, getJSONFromMap(result).toString());
             }
@@ -3001,7 +2997,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             if (TextUtils.isEmpty(roomId)) {
                 result.put("error", MSG_ROOM_ID_EMPTY);
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_EMPTY);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_ENTER_CHATROOM, getJSONFromMap(result).toString());
                 }
@@ -3065,9 +3061,9 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             limit = jsonObject.optInt("limit", 10);
             if (TextUtils.isEmpty(roomId)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_EMPTY);
-                } else {
-                    Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
+                    final HashMap<String, Object> result = new HashMap<String, Object>();
+                    result.put("error", MSG_ROOM_ID_EMPTY);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
             }
@@ -3111,13 +3107,15 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
+        final HashMap<String, Object> result = new HashMap<String, Object>();
 
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
             if (TextUtils.isEmpty(roomId)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_EMPTY);
+                    result.put("error", MSG_ROOM_ID_EMPTY);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
                 }
@@ -3156,13 +3154,15 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
+        final HashMap<String, Object> result = new HashMap<String, Object>();
 
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
             if (TextUtils.isEmpty(roomId)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_EMPTY);
+                    result.put("error", MSG_ROOM_ID_EMPTY);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
                 }
@@ -3171,8 +3171,6 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             type = jsonObject.optInt("type", 0);
             time = jsonObject.optLong("time", 0);
             limit = jsonObject.optInt("limit", 10);
-
-
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
@@ -3204,6 +3202,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         List<String> accountList = new ArrayList<String>();
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
+        final HashMap<String, Object> result = new HashMap<String, Object>();
 
         try {
             jsonObject = new JSONObject(json);
@@ -3214,7 +3213,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
             if (TextUtils.isEmpty(roomId)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_EMPTY);
+                    result.put("error", MSG_ROOM_ID_EMPTY);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     Toast.makeText(mContext, "roomId is empty !", Toast.LENGTH_SHORT).show();
                 }
@@ -3222,7 +3222,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             }
             if (ids == null) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "user id list is empty !");
+                    result.put("error", "user id list is empty !");
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     Toast.makeText(mContext, "user id list is empty !", Toast.LENGTH_SHORT).show();
                 }
@@ -3286,7 +3287,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
-
+        final HashMap<String, Object> result = new HashMap<String, Object>();
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
@@ -3295,7 +3296,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
             if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, "roomId or account is empty !");
+                    result.put("error", "roomId or account is empty !");
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     Toast.makeText(mContext, "roomId or account is empty !", Toast.LENGTH_SHORT).show();
                 }
@@ -3324,6 +3326,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         boolean isMute;
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
+        final HashMap<String, Object> result = new HashMap<String, Object>();
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
@@ -3332,7 +3335,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
             if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_OR_USER_ID_EMPTY);
+                    result.put("error", MSG_ROOM_ID_OR_USER_ID_EMPTY);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     Toast.makeText(mContext, MSG_ROOM_ID_OR_USER_ID_EMPTY, Toast.LENGTH_SHORT).show();
                 }
@@ -3361,6 +3365,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         boolean isAdmin;
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
@@ -3369,7 +3375,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
             if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_OR_USER_ID_EMPTY);
+                    result.put("error", MSG_ROOM_ID_OR_USER_ID_EMPTY);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     Toast.makeText(mContext, MSG_ROOM_ID_OR_USER_ID_EMPTY, Toast.LENGTH_SHORT).show();
                 }
@@ -3398,6 +3405,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         boolean isNormal;
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
@@ -3406,7 +3415,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
             if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_OR_USER_ID_EMPTY);
+                    result.put("error", MSG_ROOM_ID_OR_USER_ID_EMPTY);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     Toast.makeText(mContext, MSG_ROOM_ID_OR_USER_ID_EMPTY, Toast.LENGTH_SHORT).show();
                 }
@@ -3435,6 +3445,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         String reason;
         boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
         int funcId = flag ? Integer.parseInt(params[1]) : -1;
+        final HashMap<String, Object> result = new HashMap<String, Object>();
+
         try {
             jsonObject = new JSONObject(json);
             roomId = jsonObject.optString("roomId");
@@ -3443,7 +3455,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
             if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(account)) {
                 if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, MSG_ROOM_ID_OR_USER_ID_EMPTY);
+                    result.put("error", MSG_ROOM_ID_OR_USER_ID_EMPTY);
+                    callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 } else {
                     Toast.makeText(mContext, MSG_ROOM_ID_OR_USER_ID_EMPTY, Toast.LENGTH_SHORT).show();
                 }
