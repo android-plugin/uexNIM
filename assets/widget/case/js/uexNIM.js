@@ -858,6 +858,15 @@ function(CC, RootObserver) {
         };
         uexNIM.notifyForNewMsgForUser(param, cbHelper.baseCallback);
     }
+    uexNIMCase.logout = function() {
+        uexNIM.logout(function(error) {
+            if (!error) {
+                UNIT_TEST.assert(true);
+            } else {
+                UNIT_TEST.assert(false);
+            }
+        });
+    }
 
     UNIT_TEST.addCase("uexNIM", uexNIMCase);
 });
