@@ -300,7 +300,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 result.put("error", code);
                 result.put("userId", "");
                 if (loginCallbackId != -1) {
-                    callbackToJs(loginCallbackId, false, EUExCallback.F_C_FAILED, code);
+                    callbackToJs(loginCallbackId, false, code);
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_LOGIN, getJSONFromMap(result).toString());
                 }
@@ -312,7 +312,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                 result.put("result", false);
                 result.put("error", -1); //system error
                 if (loginCallbackId != -1) {
-                    callbackToJs(loginCallbackId, false, EUExCallback.F_C_FAILED, -1);
+                    callbackToJs(loginCallbackId, false, -1);
                 } else {
                     evaluateRootWindowScript(JsConst.CALLBACK_LOGIN, getJSONFromMap(result).toString());
                 }
@@ -586,7 +586,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             }
             if (sessionType != 0 && sessionType != 1 && sessionType != 2) {
                 if (funcId != -1) {
-                    result.put("error", MSG_INVALID_SESSION_TYPE)
+                    result.put("error", MSG_INVALID_SESSION_TYPE);
                     callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                 }
                 return;
