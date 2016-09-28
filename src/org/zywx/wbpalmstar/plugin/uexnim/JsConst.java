@@ -26,7 +26,10 @@ public class JsConst {
 
     public static final String CALLBACK_IS_PLAYING = "uexNIM.cbIsPlaying";
     public static final String CALLBACK_BEGAN_PLAY_AUDIO ="uexNIM.cbBeganPlayAudio";
+    public static final String ON_BEGAN_PLAY_AUDIO ="uexNIM.onBeganPlayAudio";
+
     public static final String CALLBACK_COMPLETED_PLAY_AUDIO ="uexNIM.cbCompletedPlayAudio";
+    public static final String ON_COMPLETED_PLAY_AUDIO ="uexNIM.onCompletedPlayAudio";
     public static final String CALLBACK_IS_RECORDING = "uexNIM.cbIsRecording";
 
     public static final String CALLBACK_ALL_MY_TEAMS = "uexNIM.cbAllMyTeams";

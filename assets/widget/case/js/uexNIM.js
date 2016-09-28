@@ -76,8 +76,8 @@ function(CC, RootObserver) {
             }
         };
         var observer = new RootObserver("uexNIM.onMessageSend");
-        observer.once(function(notificationID, message, extraJSON) {
-            UNIT_TEST.log("onMessageSend");
+        observer.once(function(data) {
+            UNIT_TEST.log("onMessageSend:" + data);
             UNIT_TEST.assertTrue(true);
 
         });
@@ -94,8 +94,8 @@ function(CC, RootObserver) {
             }
         };
         var observer = new RootObserver("uexNIM.onMessageSend");
-        observer.once(function(notificationID, message, extraJSON) {
-            UNIT_TEST.log("onMessageSend");
+        observer.once(function(data) {
+            UNIT_TEST.log("onMessageSend" + data);
             UNIT_TEST.assertTrue(true);
         });
         uexNIM.sendImage(JSON.stringify(params));
@@ -112,8 +112,8 @@ function(CC, RootObserver) {
             }
         };
         var observer = new RootObserver("uexNIM.onMessageSend");
-        observer.once(function(notificationID, message, extraJSON) {
-            UNIT_TEST.log("onMessageSend");
+        observer.once(function(data) {
+            UNIT_TEST.log("onMessageSend" + data);
             UNIT_TEST.assertTrue(true);
         });
         uexNIM.sendLocationMsg(JSON.stringify(params));
@@ -128,8 +128,8 @@ function(CC, RootObserver) {
             }
         };
         var observer = new RootObserver("uexNIM.onMessageSend");
-        observer.once(function(notificationID, message, extraJSON) {
-            UNIT_TEST.log("onMessageSend");
+        observer.once(function(data) {
+            UNIT_TEST.log("onMessageSend" + data);
             UNIT_TEST.assertTrue(true);
         });
         uexNIM.sendAudio(JSON.stringify(params));
@@ -145,8 +145,8 @@ function(CC, RootObserver) {
             }
         };
         var observer = new RootObserver("uexNIM.onMessageSend");
-        observer.once(function(notificationID, message, extraJSON) {
-            UNIT_TEST.log("onMessageSend");
+        observer.once(function(data) {
+            UNIT_TEST.log("onMessageSend" + data);
             UNIT_TEST.assertTrue(true);
         });
         uexNIM.sendVideo(JSON.stringify(params));
@@ -162,7 +162,7 @@ function(CC, RootObserver) {
         };
         var observer = new RootObserver("uexNIM.onMessageSend");
         observer.once(function(notificationID, message, extraJSON) {
-            UNIT_TEST.log("onMessageSend");
+            UNIT_TEST.log("onMessageSend" + data);
             UNIT_TEST.assertTrue(true);
         });
         uexNIM.sendFile(JSON.stringify(params));

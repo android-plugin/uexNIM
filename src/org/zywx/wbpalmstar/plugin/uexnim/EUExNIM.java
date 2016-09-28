@@ -424,21 +424,33 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         //如果是聊天室消息
         if (sessionType == 2) {
-            ChatRoomMessage  message = ChatRoomMessageBuilder.createChatRoomTextMessage(sessionId, content);
+            final ChatRoomMessage  message = ChatRoomMessageBuilder.createChatRoomTextMessage(sessionId, content);
             if (ext != null) {
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, content, NIMConstant.MESSAGE_TYPE_TEXT, sessionType, message);
             NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(
-                    new RequestCallbackTemplate<Void>("sendText", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
+                    new RequestCallbackTemplate<Void>("sendText", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE, new CustomDataUtil<Void>() {
+                        @Override
+                        public String getDataStr(Void avoid) {
+                            ChatRoomMessageVo vo = DataUtil.trans2ChatRoomMessageVo(message);
+                            return new Gson().toJson(vo);
+                        }
+                    }));
         } else {
-            IMMessage  message = MessageBuilder.createTextMessage(sessionId, SessionTypeEnum.typeOfValue(sessionType), content);
+            final IMMessage  message = MessageBuilder.createTextMessage(sessionId, SessionTypeEnum.typeOfValue(sessionType), content);
             if (ext != null) {
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, content, NIMConstant.MESSAGE_TYPE_TEXT, sessionType, message);
             NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(
-                    new RequestCallbackTemplate<Void>("sendText", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
+                    new RequestCallbackTemplate<Void>("sendText", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE, new CustomDataUtil<Void>() {
+                        @Override
+                        public String getDataStr(Void avoid) {
+                            MessageVo vo = DataUtil.trans2MessageVo(message);
+                            return new Gson().toJson(vo);
+                        }
+                    }));
         }
     }
 
@@ -499,17 +511,23 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         if (sessionType == 2) {
             // 创建图片消息
-            ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomImageMessage(sessionId, new File(getRealPath(filePath)), displayName);
+            final ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomImageMessage(sessionId, new File(getRealPath(filePath)), displayName);
             if (ext != null) {
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_IMAGE, sessionType, message);
             NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(
-                    new RequestCallbackTemplate<Void>("sendImage", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
+                    new RequestCallbackTemplate<Void>("sendImage", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE, new CustomDataUtil<Void>() {
+                        @Override
+                        public String getDataStr(Void avoid) {
+                            ChatRoomMessageVo vo = DataUtil.trans2ChatRoomMessageVo(message);
+                            return new Gson().toJson(vo);
+                        }
+                    }));
 
         } else {
             // 创建图片消息
-            IMMessage message = MessageBuilder.createImageMessage(
+            final IMMessage message = MessageBuilder.createImageMessage(
                      sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
                      SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
                      new File(getRealPath(filePath)), // 图片文件对象
@@ -520,7 +538,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_IMAGE, sessionType, message);
             NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(
-                    new RequestCallbackTemplate<Void>("sendImage", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
+                    new RequestCallbackTemplate<Void>("sendImage", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE, new CustomDataUtil<Void>() {
+                        @Override
+                        public String getDataStr(Void avoid) {
+                            MessageVo vo = DataUtil.trans2MessageVo(message);
+                            return new Gson().toJson(vo);
+                        }
+                    }));
         }
 
 
@@ -601,17 +625,23 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
         if (sessionType == 2) {
             // 创建地理位置消息
-            ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomLocationMessage(sessionId, latitude, longitude, title);
+            final ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomLocationMessage(sessionId, latitude, longitude, title);
             if (ext != null) {
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_IMAGE, sessionType, message);
             NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(
-                    new RequestCallbackTemplate<Void>("sendLocationMsg", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
+                    new RequestCallbackTemplate<Void>("sendLocationMsg", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE, new CustomDataUtil<Void>() {
+                        @Override
+                        public String getDataStr(Void avoid) {
+                            ChatRoomMessageVo vo = DataUtil.trans2ChatRoomMessageVo(message);
+                            return new Gson().toJson(vo);
+                        }
+                    }));
         } else {
             // 发送其他类型的消息代码类似，演示如下
             // 创建地理位置消息
-            IMMessage message = MessageBuilder.createLocationMessage(
+            final IMMessage message = MessageBuilder.createLocationMessage(
                     sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
                     SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
                     latitude, // 纬度
@@ -623,7 +653,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_LOCATION, sessionType, message);
             NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(
-                    new RequestCallbackTemplate<Void>("sendLocationMsg", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
+                    new RequestCallbackTemplate<Void>("sendLocationMsg", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE, new CustomDataUtil<Void>() {
+                        @Override
+                        public String getDataStr(Void avoid) {
+                            MessageVo vo = DataUtil.trans2MessageVo(message);
+                            return new Gson().toJson(vo);
+                        }
+                    }));
         }
     }
 
@@ -676,15 +712,21 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         int duration = mp.getDuration();
         if (sessionType == 2) {
             // 创建音频消息
-            ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomAudioMessage(sessionId, file, duration);
+            final ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomAudioMessage(sessionId, file, duration);
             if (ext != null) {
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_AUDIO, sessionType, message);
             NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(
-                    new RequestCallbackTemplate<Void>("sendAudio", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
+                    new RequestCallbackTemplate<Void>("sendAudio", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE, new CustomDataUtil<Void>() {
+                        @Override
+                        public String getDataStr(Void avoid) {
+                            ChatRoomMessageVo vo = DataUtil.trans2ChatRoomMessageVo(message);
+                            return new Gson().toJson(vo);
+                        }
+                    }));
         } else {
-            IMMessage  message = MessageBuilder.createAudioMessage(
+            final IMMessage  message = MessageBuilder.createAudioMessage(
                     sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
                     SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
                     file, // 音频文件
@@ -695,7 +737,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_AUDIO, sessionType, message);
             NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(
-                    new RequestCallbackTemplate<Void>("sendAudio", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
+                    new RequestCallbackTemplate<Void>("sendAudio", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE, new CustomDataUtil<Void>() {
+                        @Override
+                        public String getDataStr(Void avoid) {
+                            MessageVo vo = DataUtil.trans2MessageVo(message);
+                            return new Gson().toJson(vo);
+                        }
+                    }));
         }
     }
 
@@ -750,16 +798,22 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         int width = mp.getVideoWidth();
         int height = mp.getVideoHeight();
         if (sessionType == 2) {
-            ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomVideoMessage(sessionId, file, duration, width, height, displayName);
+            final ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomVideoMessage(sessionId, file, duration, width, height, displayName);
             if (ext != null) {
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_VIDEO, sessionType, message);
             NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(
-                    new RequestCallbackTemplate<Void>("sendVideo", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
+                    new RequestCallbackTemplate<Void>("sendVideo", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE, new CustomDataUtil<Void>() {
+                        @Override
+                        public String getDataStr(Void avoid) {
+                            ChatRoomMessageVo vo = DataUtil.trans2ChatRoomMessageVo(message);
+                            return new Gson().toJson(vo);
+                        }
+                    }));
         } else {
             // 创建视频消息
-            IMMessage message = MessageBuilder.createVideoMessage(
+            final IMMessage message = MessageBuilder.createVideoMessage(
                     sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
                     SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
                     file, // 视频文件
@@ -773,7 +827,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_VIDEO, sessionType, message);
             NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(
-                    new RequestCallbackTemplate<Void>("sendVideo", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
+                    new RequestCallbackTemplate<Void>("sendVideo", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE,  new CustomDataUtil<Void>() {
+                        @Override
+                        public String getDataStr(Void avoid) {
+                            MessageVo vo = DataUtil.trans2MessageVo(message);
+                            return new Gson().toJson(vo);
+                        }
+                    }));
         }
     }
 
@@ -823,15 +883,21 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
         }
         File file = new File(getRealPath(filePath));
         if (sessionType == 2) {
-            ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomFileMessage(sessionId, file, displayName);
+            final ChatRoomMessage message = ChatRoomMessageBuilder.createChatRoomFileMessage(sessionId, file, displayName);
             if (ext != null) {
                 message.setRemoteExtension(ext);
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_FILE, sessionType, message);
             NIMClient.getService(ChatRoomService.class).sendMessage(message, true).setCallback(
-                    new RequestCallbackTemplate<Void>("sendFile", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
+                    new RequestCallbackTemplate<Void>("sendFile", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE, new CustomDataUtil<Void>() {
+                        @Override
+                        public String getDataStr(Void avoid) {
+                            ChatRoomMessageVo vo = DataUtil.trans2ChatRoomMessageVo(message);
+                            return new Gson().toJson(vo);
+                        }
+                    }));
         } else {
-            IMMessage message = MessageBuilder.createFileMessage(
+            final IMMessage message = MessageBuilder.createFileMessage(
                     sessionId, // 聊天对象的 ID，如果是单聊，为用户帐号，如果是群聊，为群组 ID
                     SessionTypeEnum.typeOfValue(sessionType), // 聊天类型，单聊或群组
                     file,
@@ -841,7 +907,13 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             }
             willSendMsgCallback(sessionId, null, NIMConstant.MESSAGE_TYPE_FILE, sessionType, message);
             NIMClient.getService(MsgService.class).sendMessage(message, true).setCallback(
-                    new RequestCallbackTemplate<Void>("sendFile", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE));
+                    new RequestCallbackTemplate<Void>("sendFile", funcId, JsConst.CALLBACK_DID_SEND_MESSAGE, new CustomDataUtil<Void>() {
+                        @Override
+                        public String getDataStr(Void avoid) {
+                            MessageVo vo = DataUtil.trans2MessageVo(message);
+                            return new Gson().toJson(vo);
+                        }
+                    }));
         }
     }
 
@@ -1053,8 +1125,6 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             Log.i(TAG, e.getMessage());
             Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
         }
-        boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
-        final int funcId = flag ? Integer.parseInt(params[1]) : -1;
 
         final String realPath = getRealPath(filePath);
         final String tempPath = filePath ;
@@ -1067,25 +1137,18 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             public void onPrepared() {
                 HashMap<String, Object> map = new HashMap<String, Object>();
                 map.put("filePath", tempPath);
-                map.put("status", 1);
-                if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, getJSONFromMap(map));
-                } else {
-                    evaluateRootWindowScript(JsConst.CALLBACK_BEGAN_PLAY_AUDIO, getJSONFromMap(map).toString());
-                }
-
+                //4.0改成on
+                evaluateRootWindowScript(JsConst.ON_BEGAN_PLAY_AUDIO, getJSONFromMap(map).toString());
+                evaluateRootWindowScript(JsConst.CALLBACK_BEGAN_PLAY_AUDIO, getJSONFromMap(map).toString());
             }
 
             @Override
             public void onCompletion() {
                 HashMap<String, Object> map = new HashMap<String, Object>();
                 map.put("filePath", tempPath);
-                map.put("status", 2);
-                if (funcId != -1) {
-                    callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS, getJSONFromMap(map));
-                } else {
-                    evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_PLAY_AUDIO, getJSONFromMap(map).toString());
-                }
+                //4.0改成on
+                evaluateRootWindowScript(JsConst.ON_COMPLETED_PLAY_AUDIO, getJSONFromMap(map).toString());
+                evaluateRootWindowScript(JsConst.CALLBACK_COMPLETED_PLAY_AUDIO, getJSONFromMap(map).toString());
             }
 
             @Override
