@@ -161,7 +161,7 @@ function(CC, RootObserver) {
             }
         };
         var observer = new RootObserver("uexNIM.onMessageSend");
-        observer.once(function(notificationID, message, extraJSON) {
+        observer.once(function(data) {
             UNIT_TEST.log("onMessageSend" + data);
             UNIT_TEST.assertTrue(true);
         });
@@ -177,7 +177,7 @@ function(CC, RootObserver) {
             }
         };
         var observer = new RootObserver("uexNIM.willSendMessage");
-        observer.once(function(notificationID, message, extraJSON) {
+        observer.once(function(data) {
             UNIT_TEST.log("onMessageSend");
             UNIT_TEST.assertTrue(true);
 
