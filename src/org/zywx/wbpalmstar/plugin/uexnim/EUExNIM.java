@@ -729,6 +729,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     MessageVo vo = new MessageVo();
                     vo.setMessageId(recent.getRecentMessageId());
                     vo.setFrom(recent.getFromAccount());
+                    //获取最近联系人的ID（好友帐号，群ID等）
+                    vo.setSessionId(recent.getContactId());
                     if (msgTypeEnum == MsgTypeEnum.text) {
                         vo.setText(recent.getContent());
                     } else if (msgTypeEnum == MsgTypeEnum.audio) {
@@ -2209,12 +2211,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             config.enableUnreadCount = shouldBeCounted;
             config.enablePushNick = apnsWithPrefix; //仅针对iOS
             command.setConfig(config);
-            //定义通知内容
-            JSONObject jsonContent = new JSONObject();
-            jsonContent.put("id", "2");
-            JSONObject data = new JSONObject();
-            data.put("body", content);
-            command.setContent(jsonContent.toString());
+
+            command.setContent(content);
             command.setApnsText(apnsContent);
             command.setSendToOnlineUserOnly(sendToOnlineUsersOnly);
             //发送通知

@@ -4,16 +4,13 @@ import com.netease.nimlib.sdk.msg.constant.SessionTypeEnum;
 
 
 public class RecentSessionVo {
-    private SessionTypeEnum sessionTypeEnum;
+    private SessionTypeEnum sessionType;
     private int unreadCount;
     private MessageVo lastMessage;
 
-    public SessionTypeEnum getSessionTypeEnum() {
-        return sessionTypeEnum;
-    }
 
-    public void setSessionTypeEnum(SessionTypeEnum sessionTypeEnum) {
-        this.sessionTypeEnum = sessionTypeEnum;
+    public void setSessionTypeEnum(SessionTypeEnum sessionType) {
+        this.sessionType = sessionType;
     }
 
     public int getUnreadCount() {
