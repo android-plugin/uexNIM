@@ -35,6 +35,7 @@ android {
     }
     defaultConfig {
         applicationId "org.zywx.wbpalmstar.widgetone.uexnim"
+        multiDexEnabled true
     }
 
     sourceSets {
