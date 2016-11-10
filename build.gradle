@@ -35,6 +35,8 @@ android {
     }
     defaultConfig {
         applicationId "org.zywx.wbpalmstar.widgetone.uexnim"
+        minSdkVersion 14
+        targetSdkVersion 19
         multiDexEnabled true
     }
 
