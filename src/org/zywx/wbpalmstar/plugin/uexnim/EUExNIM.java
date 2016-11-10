@@ -876,6 +876,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     MessageVo vo = new MessageVo();
                     vo.setMessageId(recent.getRecentMessageId());
                     vo.setFrom(recent.getFromAccount());
+                    //获取最近联系人的ID（好友帐号，群ID等）
+                    vo.setSessionId(recent.getContactId());
                     if (msgTypeEnum == MsgTypeEnum.text) {
                         vo.setText(recent.getContent());
                     } else if (msgTypeEnum == MsgTypeEnum.audio) {

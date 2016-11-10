@@ -1,8 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <uexplugins>
     <plugin
-        uexName="uexNIM" version="4.0.0" build="2">
-        <info>2:4.0</info>
+        uexName="uexNIM" version="4.0.0" build="3">
+        <info>3:allRecentSession接口新增sessionId属性</info>
+        <build>2:4.0 插件出新</build>
         <build>1:添加聊天室，用户资料管理，用户关系管理和系统通知</build>
         <build>0:网易云信(uexNIM)插件</build>
     </plugin>
