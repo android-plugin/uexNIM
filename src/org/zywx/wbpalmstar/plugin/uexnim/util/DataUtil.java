@@ -210,6 +210,7 @@ public class DataUtil<V> {
         vo.setBirth(user.getBirthday());
         vo.setMobile(user.getMobile());
         vo.setExt(user.getExtension());
+        vo.setAccount(user.getAccount());
         return vo;
     }
 

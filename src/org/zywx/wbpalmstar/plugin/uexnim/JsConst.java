@@ -12,7 +12,7 @@ public class JsConst {
     public static final String CALLBACK_REGISTER_USER = "uexNIM.cbRegisterUser";
 
 
-    public static final String CALLBACK_DID_SEND_MESSAGE = "uexNIM.cbDidSendMessage";
+    public static final String CALLBACK_DID_SEND_MESSAGE = "uexNIM.onMessageSend";
     public static final String ON_SEND_MESSAGE_WITH_PROGRESS = "uexNIM.onSendMessageWithProgress";
     public static final String WILL_SEND_MESSAGE = "uexNIM.willSendMessage";
     public static final String ON_RECIEVED_MESSAGE = "uexNIM.onRecvMessages"; //接收到消息时的监听
@@ -26,7 +26,10 @@ public class JsConst {
 
     public static final String CALLBACK_IS_PLAYING = "uexNIM.cbIsPlaying";
     public static final String CALLBACK_BEGAN_PLAY_AUDIO ="uexNIM.cbBeganPlayAudio";
+    public static final String ON_BEGAN_PLAY_AUDIO ="uexNIM.onBeganPlayAudio";
+
     public static final String CALLBACK_COMPLETED_PLAY_AUDIO ="uexNIM.cbCompletedPlayAudio";
+    public static final String ON_COMPLETED_PLAY_AUDIO ="uexNIM.onCompletedPlayAudio";
     public static final String CALLBACK_IS_RECORDING = "uexNIM.cbIsRecording";
 
     public static final String CALLBACK_ALL_MY_TEAMS = "uexNIM.cbAllMyTeams";
@@ -92,4 +95,5 @@ public class JsConst {
     public static final String CALLBACK_SET_NORMAL = "uexNIM.cbSetNormal";
     public static final String CALLBACK_KICK_MEMBER_FROM_CHAT_ROOM = "uexNIM.cbkKickMemberFromChatRoom";
     public static final String ON_CHAT_ROOM_KICK_OUT_EVENT = "uexNIM.onChatRoomKickOutEvent";
+    public static final String ON_BLACK_LIST_CHANGED = "uexNIM.onBlackListChanged";
 }

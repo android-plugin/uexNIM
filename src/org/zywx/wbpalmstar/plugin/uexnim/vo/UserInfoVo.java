@@ -13,6 +13,7 @@ public class UserInfoVo {
     private String birth;
     private String mobile;
     private String ext;
+    private String account;
 
     public String getNickName() {
         return nickName;
@@ -84,5 +85,13 @@ public class UserInfoVo {
 
     public void setExt(String ext) {
         this.ext = ext;
+    }
+
+    public String getAccount() {
+        return account;
+    }
+
+    public void setAccount(String account) {
+        this.account = account;
     }
 }

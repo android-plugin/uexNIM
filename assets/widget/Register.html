@@ -43,11 +43,22 @@
     function registerApp(){
         var appKey = document.getElementById("initEasemobappKey").value;
         var apnsCertName = document.getElementById("initEasemobapnsCertName").value;
+        console.log('appKey:' + appKey + "\n        apnsCertName:" + apnsCertName);
         var param={
             appKey:appKey,//区别app的标识
             apnsCertName:apnsCertName,//iOS中推送证书名称(仅iOS)
         };
         uexNIM.registerApp(JSON.stringify(param));
+
+        uexNIM.registerApp(JSON.stringify(param), function(error, code) {
+            if (!error) {
+                alert('registerApp success');
+            } else {
+                alert('registerApp fail, code:' + code);
+            }
+        });
+
+
     }
     function registerUser(){
         var param = {

@@ -36,11 +36,11 @@
     <script src="js/appcan.js"></script>
     <script type="text/javascript">
         window.uexOnload = function(type){
-            
-        }
-    
 
-    
+        }
+
+
+
     //[2.5]
     function sendText(){
         var username = document.getElementById("sendTextusername").value;
@@ -55,7 +55,7 @@
         };
         uexNIM.sendText(JSON.stringify(params));
     }
-    
+
     //[2.6]
     function sendImage(){
         var username = document.getElementById("sendPictureusername").value;
@@ -70,7 +70,7 @@
         };
         uexNIM.sendImage(JSON.stringify(params));
     }
-    
+
     //[2.7]
     function sendLocationMsg(){
         var username = document.getElementById("sendLocationMsgusername").value;
@@ -89,7 +89,7 @@
         };
         uexNIM.sendLocationMsg(JSON.stringify(params));
     }
-    
+
     //[2.8]
     function sendAudio(){
         var username = document.getElementById("sendAudiousername").value;
@@ -104,7 +104,7 @@
         };
         uexNIM.sendAudio(JSON.stringify(params));
     }
-    
+
     //[2.9]
     function sendVideo(){
         var username = document.getElementById("sendVideousername").value;
@@ -171,7 +171,7 @@
         }
         uexNIM.markAllMessagesReadInSession(JSON.stringify(param));
     }
-    
+
     //4.1 历史记录
     function fetchMessageHistory(){
         var param={
@@ -219,12 +219,12 @@
      </div>
      <!--header结束--><!--content开始-->
      <div id="content" class="ub-f1 tx-l t-bla" style="">
-         
+
      <div class="conbor">
         <div class="consj" id="topDiv">
         <div id='globalPostArea'>全局广播显示区域</div><br><br>
-            
-            
+
+
              <div> </div><div>======Message==========</div>
             <div> </div><span>[2.5]  sendText</span>
             <div>sessenId:</div><input class="textbox" type="text" id="sendTextusername" value="appcanuser2"></input>
@@ -232,7 +232,7 @@
             <div>content:</div><input class="textbox" type="text" id="sendTextcontent" value="Textcontent"></input>
             <div>ext:</div><input class="textbox" type="text" id="sendTextExt" value='{"ext": "extValueText"}'></input>
             <input class='btn' type='button' value='调用接口' onclick='sendText()'></input>
-            
+
             <div> </div><span>[2.6]  sendImage</span>
             <div>sessenId:</div><input class="textbox" type="text" id="sendPictureusername" value="appcanuser2"></input>
             <div>sessionType:</div><input class="textbox" type="text" id="sendPicturechatType" value="0"></input>
@@ -240,7 +240,7 @@
             <div>ext:</div><input class="textbox" type="text" id="sendImageExt" value='{"ext": "extValueImage"}'></input>
 
             <input class='btn' type='button' value='调用接口' onclick='sendImage()'></input>
-            
+
             <div> </div><span>[2.7]  sendLocationMsg</span>
             <div>sessenId:</div><input class="textbox" type="text" id="sendLocationMsgusername" value="appcanuser2"></input>
             <div>sessionType:</div><input class="textbox" type="text" id="sendLocationMsgchatType" value="0"></input>
@@ -250,14 +250,14 @@
             <div>ext:</div><input class="textbox" type="text" id="sendLocationMsgExt" value='{"ext": "extValueLocation"}'></input>
 
             <input class='btn' type='button' value='调用接口' onclick='sendLocationMsg()'></input>
-            
+
             <div> </div><span>[2.8]  sendAudio</span>
             <div>sessenId:</div><input class="textbox" type="text" id="sendAudiousername" value="appcanuser2"></input>
             <div>sessionType:</div><input class="textbox" type="text" id="sendAudiochatType" value="0"></input>
             <div>filePath:</div><input class="textbox" type="text" id="sendAudiofilePath" value="res://callRing.mp3"></input>
             <div>ext:</div><input class="textbox" type="text" id="sendAudioExt" value='{"ext": "extValueAudio"}'></input>
             <input class='btn' type='button' value='调用接口' onclick='sendAudio()'></input>
-            
+
             <div> </div><span>[2.9]  sendVideo</span>
             <div>sessenId:</div><input class="textbox" type="text" id="sendVideousername" value="appcanuser2"></input>
             <div>sessionType:</div><input class="textbox" type="text" id="sendVideochatType" value="0"></input>
@@ -270,41 +270,41 @@
             <div>sessionType:</div><input class="textbox" type="text" id="sendFilechatType" value="0"></input>
             <div>filePath:</div><input class="textbox" type="text" id="sendFilefilePath" value="res://1.mp4"></input>
             <input class='btn' type='button' value='调用接口' onclick='sendFile()'></input>
-            
+
             <div> </div><span>[2.11]  resendMessage</span>
             <input class='btn' type='button' value='调用接口' onclick='resendMessage()'></input>
-            
+
             <div> </div><span>[2.12]  allRecentSession</span>
             <input class='btn' type='button' value='调用接口' onclick='allRecentSession()'></input>
-            
+
             <div> </div><span>[2.13]  deleteMessage</span>
             <input class='btn' type='button' value='调用接口' onclick='deleteMessage()'></input>
-            
+
             <div> </div><span>[2.14]  deleteAllmessagesInSession</span>
             <input class='btn' type='button' value='调用接口' onclick='deleteAllmessagesInSession()'></input>
-            
+
             <div> </div><span>[2.15]  deleteAllMessages</span>
             <input class='btn' type='button' value='调用接口' onclick='deleteAllMessages()'></input>
-            
+
             <div> </div><span>[2.16]  allUnreadCount</span>
             <input class='btn' type='button' value='调用接口' onclick='allUnreadCount()'></input>
-            
+
             <div> </div><span>[2.17]  markAllMessagesReadInSession</span>
             <input class='btn' type='button' value='调用接口' onclick='markAllMessagesReadInSession()'></input>
-            
+
             <div>======4.历史消息==========</div>
             <div>sessenId(下面几个接口共用此输入框):</div><input class="textbox" type="text" id="history_sessionId" value="appcanuser2"></input>
             <div>sessionType(下面几个接口共用此输入框):</div><input class="textbox" type="text" id="history_sessionType" value="0"></input>
             <div> </div><span>[4.1] fetchMessageHistory</span>
             <input class='btn' type='button' value='调用接口' onclick='fetchMessageHistory()'></input>
-            
+
             <div> </div><span>[4.2] messagesInSession</span>
             <input class='btn' type='button' value='调用接口' onclick='messagesInSession()'></input>
-            
+
             <div> </div><span>[4.3] searchMessages</span>
             <input class='btn' type='button' value='调用接口' onclick='searchMessages()'></input>
         </div>
-        
+
         <div>======回调区域==========</div>
         <div id='TestCallBack'>原本内容</div>
         <div id='TestData'>原本内容</div>

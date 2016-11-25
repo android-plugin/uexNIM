@@ -2,8 +2,7 @@
 <uexplugins>
     <plugin
         className="org.zywx.wbpalmstar.plugin.uexnim.EUExNIM"
-        uexName="uexNIM"
-        global="true">
+        uexName="uexNIM">
         <method name = "registerApp" />
         <method name = "login" />
         <method name = "logout" />

@@ -8,7 +8,6 @@ public class RecentSessionVo {
     private int unreadCount;
     private MessageVo lastMessage;
 
-
     public void setSessionTypeEnum(SessionTypeEnum sessionType) {
         this.sessionType = sessionType;
     }
