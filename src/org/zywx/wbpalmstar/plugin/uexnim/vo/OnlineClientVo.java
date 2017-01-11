@@ -6,7 +6,7 @@ package org.zywx.wbpalmstar.plugin.uexnim.vo;
 public class OnlineClientVo {
     private int type;
     private String os;
-    private int timestamp;
+    public long timestamp;
 
     public int getType() {
         return type;
@@ -24,11 +24,4 @@ public class OnlineClientVo {
         this.os = os;
     }
 
-    public int getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(int timestamp) {
-        this.timestamp = timestamp;
-    }
 }

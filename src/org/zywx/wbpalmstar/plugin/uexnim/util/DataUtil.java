@@ -1,7 +1,6 @@
 package org.zywx.wbpalmstar.plugin.uexnim.util;
 
 import com.netease.nimlib.sdk.auth.OnlineClient;
-import com.netease.nimlib.sdk.avchat.model.AVChatAttachment;
 import com.netease.nimlib.sdk.chatroom.model.ChatRoomInfo;
 import com.netease.nimlib.sdk.chatroom.model.ChatRoomMember;
 import com.netease.nimlib.sdk.chatroom.model.ChatRoomMessage;
@@ -74,6 +73,7 @@ public class DataUtil<V> {
         vo.setFrom(msg.getFromAccount());
         vo.setTimestamp(msg.getTime());
         vo.setSessionId(msg.getSessionId());
+        vo.senderName=msg.getFromNick();
         vo.setSessionType(msg.getSessionType().getValue());
         vo.setExt(msg.getRemoteExtension());
         MsgTypeEnum msgTypeEnum = msg.getMsgType();
@@ -109,7 +109,7 @@ public class DataUtil<V> {
             vo.setLongitude(attach.getLongitude());
         } else if (msgTypeEnum == MsgTypeEnum.notification) {
             MsgAttachment attachment = msg.getAttachment();
-            if (attachment instanceof AVChatAttachment) {
+            if (attachment instanceof AudioAttachment) {
                 vo.setNotificationType(2);
             } else if (attachment instanceof ChatRoomNotificationAttachment) {
                 vo.setNotificationType(3);
@@ -175,7 +175,7 @@ public class DataUtil<V> {
     public static OnlineClientVo trans2OnlineClientVo(OnlineClient client) {
         OnlineClientVo vo = new OnlineClientVo();
         vo.setOs(client.getOs());
-        vo.setTimestamp(client.getLoginTime());
+        vo.timestamp=client.getLoginTime();
         vo.setType(client.getClientType());
         return vo;
     }

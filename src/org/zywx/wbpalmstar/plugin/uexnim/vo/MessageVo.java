@@ -14,6 +14,8 @@ public class MessageVo {
     private Long timestamp;
     private String sessionId;
     private int sessionType;
+
+    public String senderName;
     private String path;
     private String url;
     private Long fileLength;
