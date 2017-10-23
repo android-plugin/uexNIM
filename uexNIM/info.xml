@@ -1,7 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <uexplugins>
     <plugin
-        uexName="uexNIM" version="4.0.0" build="0">
-        <info>0:allRecentSession接口新增sessionId属性</info>
+        uexName="uexNIM" version="4.0.1" build="1">
+        <info>1:更新云信SDK</info>
+        <build>0:allRecentSession接口新增sessionId属性</build>
     </plugin>
 </uexplugins>

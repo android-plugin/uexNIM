@@ -64,6 +64,7 @@ import com.netease.nimlib.sdk.team.TeamService;
 import com.netease.nimlib.sdk.team.constant.TeamFieldEnum;
 import com.netease.nimlib.sdk.team.constant.TeamTypeEnum;
 import com.netease.nimlib.sdk.team.constant.VerifyTypeEnum;
+import com.netease.nimlib.sdk.team.model.CreateTeamResult;
 import com.netease.nimlib.sdk.team.model.Team;
 import com.netease.nimlib.sdk.team.model.TeamMember;
 import com.netease.nimlib.sdk.uinfo.UserInfoProvider;
@@ -1543,14 +1544,27 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             final int funcId = flag ? Integer.parseInt(params[1]) : -1;
 
             NIMClient.getService(TeamService.class).createTeam(fields, teamType, postscript, userIdList).setCallback(
-                    new RequestCallbackTemplate<Team>("createTeam", funcId, JsConst.CALLBACK_CREATE_TEAM, new CustomDataUtil<Team>() {
+                    new RequestCallbackTemplate<CreateTeamResult>("createTeam", funcId, JsConst.CALLBACK_CREATE_TEAM, new CustomDataUtil<Team>() {
+
                         @Override
                         public String getDataStr(Team team) {
                             result.put("teamId", team.getId());
                             result.put("error", "");
                             return getJSONFromMap(result).toString();
                         }
-                    }));
+                    }
+
+            ));
+
+//            NIMClient.getService(TeamService.class).createTeam(fields, teamType, postscript, userIdList).setCallback(
+//                    new RequestCallbackTemplate<Team>("createTeam", funcId, JsConst.CALLBACK_CREATE_TEAM, new CustomDataUtil<Team>() {
+//                        @Override
+//                        public String getDataStr(Team team) {
+//                            result.put("teamId", team.getId());
+//                            result.put("error", "");
+//                            return getJSONFromMap(result).toString();
+//                        }
+//                    }));
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }
@@ -1592,9 +1606,9 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
             boolean flag = params.length == 2 && BUtility.isNumeric(params[1]);
             final int funcId = flag ? Integer.parseInt(params[1]) : -1;
 
-            NIMClient.getService(TeamService.class).addMembers(teamId, userList).setCallback(new RequestCallback<Void>() {
+            NIMClient.getService(TeamService.class).addMembers(teamId, userList).setCallback(new RequestCallback<List<String>>() {
                 @Override
-                public void onSuccess(Void aVoid) {
+                public void onSuccess(List<String> strings) {
                     if (funcId != -1) {
                         callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
                     } else {
@@ -1604,6 +1618,7 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
 
                 @Override
                 public void onFailed(int i) {
+
                     //高级群不能直接拉人，发出邀请成功会返回810，此处应该认为邀请已发出
                     result.put("error", i);
                     if (funcId != -1) {
@@ -1615,18 +1630,57 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
                     } else {
                         evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result).toString());
                     }
+
                 }
 
                 @Override
                 public void onException(Throwable throwable) {
+
                     result.put("error", throwable.getMessage());
                     if (funcId != -1) {
                         callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
                     } else {
                         evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result).toString());
                     }
+
                 }
             });
+
+//            NIMClient.getService(TeamService.class).addMembers(teamId, userList).setCallback(new RequestCallback<Void>() {
+//                @Override
+//                public void onSuccess(Void aVoid) {
+//                    if (funcId != -1) {
+//                        callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
+//                    } else {
+//                        evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result).toString());
+//                    }
+//                }
+//
+//                @Override
+//                public void onFailed(int i) {
+//                    //高级群不能直接拉人，发出邀请成功会返回810，此处应该认为邀请已发出
+//                    result.put("error", i);
+//                    if (funcId != -1) {
+//                        if (i == 810) {
+//                            callbackToJs(funcId, false, EUExCallback.F_C_SUCCESS);
+//                        } else {
+//                            callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
+//                        }
+//                    } else {
+//                        evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result).toString());
+//                    }
+//                }
+//
+//                @Override
+//                public void onException(Throwable throwable) {
+//                    result.put("error", throwable.getMessage());
+//                    if (funcId != -1) {
+//                        callbackToJs(funcId, false, EUExCallback.F_C_FAILED, getJSONFromMap(result));
+//                    } else {
+//                        evaluateRootWindowScript(JsConst.CALLBACK_ADD_USERS, getJSONFromMap(result).toString());
+//                    }
+//                }
+//            });
         } catch (JSONException e) {
             Log.i(TAG, e.getMessage());
         }

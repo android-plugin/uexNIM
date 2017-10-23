@@ -175,7 +175,7 @@ public class DataUtil<V> {
     public static OnlineClientVo trans2OnlineClientVo(OnlineClient client) {
         OnlineClientVo vo = new OnlineClientVo();
         vo.setOs(client.getOs());
-        vo.setTimestamp(client.getLoginTime());
+        vo.setTimestamp((int) client.getLoginTime());
         vo.setType(client.getClientType());
         return vo;
     }
