@@ -1,14 +1,18 @@
 package org.zywx.wbpalmstar.plugin.uexnim;
 
+import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Environment;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
 import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
@@ -78,6 +82,7 @@ import org.json.JSONObject;
 import org.zywx.wbpalmstar.base.BUtility;
 import org.zywx.wbpalmstar.base.ResoureFinder;
 import org.zywx.wbpalmstar.engine.DataHelper;
+import org.zywx.wbpalmstar.engine.EBrowserActivity;
 import org.zywx.wbpalmstar.engine.EBrowserView;
 import org.zywx.wbpalmstar.engine.universalex.EUExBase;
 import org.zywx.wbpalmstar.engine.universalex.EUExCallback;
@@ -123,6 +128,8 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
     private AudioRecorder audioRecorder;
     private String TEMP_PATH = "nim_temp";
     private static EBrowserView rootEBrowserView;
+
+    private String[] switchAudioParams;
 
     public EUExNIM(Context context, EBrowserView eBrowserView) {
         super(context, eBrowserView);
@@ -1079,32 +1086,41 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
      *切换音频的输出设备
      */
     public boolean switchAudioOutputDevice(String params []) {
-        if (params == null || params.length < 1) {
-            errorCallback(0, 0, "error params!");
+        switchAudioParams = params;
+        // android6.0以上动态权限申请
+        if (mContext.checkCallingOrSelfPermission(Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED){
+            requsetPerssions(Manifest.permission.RECORD_AUDIO, "请先申请权限"
+                    + Manifest.permission.RECORD_AUDIO, 1);
             return false;
-        }
-        String json = params[0];
-        JSONObject jsonObject;
-        int outputDevice = 0;
-        try {
-            jsonObject = new JSONObject(json);
-            outputDevice = jsonObject.optInt("outputDevice");
-        } catch (JSONException e) {
-            Log.i(TAG, e.getMessage());
-            Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
-        }
-        if (player == null) {
-            player = new AudioPlayer(mContext);
-        }
-        if(outputDevice == 0) {
-            player.start(AudioManager.STREAM_VOICE_CALL);
         } else {
-            player.start(AudioManager.STREAM_MUSIC);
+            if (params == null || params.length < 1) {
+                errorCallback(0, 0, "error params!");
+                return false;
+            }
+            String json = params[0];
+            JSONObject jsonObject;
+            int outputDevice = 0;
+            try {
+                jsonObject = new JSONObject(json);
+                outputDevice = jsonObject.optInt("outputDevice");
+            } catch (JSONException e) {
+                Log.i(TAG, e.getMessage());
+                Toast.makeText(mContext, "JSON解析错误", Toast.LENGTH_SHORT).show();
+            }
+            if (player == null) {
+                player = new AudioPlayer(mContext);
+            }
+            if (outputDevice == 0) {
+                player.start(AudioManager.STREAM_VOICE_CALL);
+            } else {
+                player.start(AudioManager.STREAM_MUSIC);
+            }
+            HashMap<String, Object> result = new HashMap<String, Object>();
+            result.put("result", true);
+            evaluateRootWindowScript(JsConst.CALLBACK_SWITCH_AUTIO_OUTPUT_DEVICE, getJSONFromMap(result).toString());
+            return true;
         }
-        HashMap<String, Object> result = new HashMap<String, Object>();
-        result.put("result", true);
-        evaluateRootWindowScript(JsConst.CALLBACK_SWITCH_AUTIO_OUTPUT_DEVICE, getJSONFromMap(result).toString());
-        return true;
     }
 
     public boolean isPlaying(String params[]) {
@@ -3855,5 +3871,27 @@ public class EUExNIM extends EUExBase implements ListenerRegister.ListenersCallb
     @Override
     public void onBlackListChanged(BlackListChangedNotify blackListChangedNotify) {
         evaluateRootWindowScript(JsConst.ON_BLACK_LIST_CHANGED, null);
+    }
+
+    @Override
+    public void onRequestPermissionResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionResult(requestCode, permissions, grantResults);
+        if (requestCode == 1){
+
+            if (grantResults[0] != PackageManager.PERMISSION_DENIED){
+                switchAudioOutputDevice(switchAudioParams);
+            } else {
+                // 对于 ActivityCompat.shouldShowRequestPermissionRationale
+                // 1：用户拒绝了该权限，没有勾选"不再提醒"，此方法将返回true。
+                // 2：用户拒绝了该权限，有勾选"不再提醒"，此方法将返回 false。
+                // 3：如果用户同意了权限，此方法返回false
+                // 拒绝了权限且勾选了"不再提醒"
+                if (!ActivityCompat.shouldShowRequestPermissionRationale((EBrowserActivity)mContext, permissions[0])) {
+                    Toast.makeText(mContext, "请先设置权限" + permissions[0], Toast.LENGTH_LONG).show();
+                } else {
+                    requsetPerssions(Manifest.permission.RECORD_AUDIO, "请先申请权限" + permissions[0], 1);
+                }
+            }
+        }
     }
 }
